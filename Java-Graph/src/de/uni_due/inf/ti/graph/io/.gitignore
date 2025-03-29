@@ -1,0 +1,7 @@
+/SgfParser.java
+/SgfParserConstants.java
+/SgfParserTokenManager.java
+/ParseException.java
+/SimpleCharStream.java
+/Token.java
+/TokenMgrError.java
