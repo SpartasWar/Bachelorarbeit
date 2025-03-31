@@ -1,11 +1,13 @@
 package de.uni_due.inf.ti.tableaugc;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Stream;
 
 import de.uni_due.inf.ti.gcsolvers.IterativeSolver;
+import de.uni_due.inf.ti.gcsolvers.MakeAlternating;
 import de.uni_due.inf.ti.gcsolvers.ModelCandidate;
 import de.uni_due.inf.ti.gcsolvers.SolverResult;
 import de.uni_due.inf.ti.graph.Morphism;
@@ -14,6 +16,9 @@ import de.uni_due.inf.ti.graph.condition.Disjunction;
 import de.uni_due.inf.ti.graph.condition.Existential;
 import de.uni_due.inf.ti.graph.condition.ForAll;
 import de.uni_due.inf.ti.graph.condition.GraphCondition;
+import de.uni_due.inf.ti.graph.io.SgfMap;
+import de.uni_due.inf.ti.graph.io.SgfParser;
+import de.uni_due.inf.ti.graph.io.SgfWriter;
 import de.uni_due.inf.ti.util.Enumerators;
 
 public class TableauSolver extends IterativeSolver {
@@ -98,6 +103,7 @@ public class TableauSolver extends IterativeSolver {
 				 * candidate, or if that could get us trapped in infinite loops (or is
 				 * somehow bad for other reasons)
 				 * This probably MUST be done, to ensure the fairness condition!
+				 * If not keeping a queue, one could at least pick a random candidate.
 				 */
 				Disjunction disj = pullForward(leaf, leafForAll);
 				for (GraphCondition dc : disj.getChildConditions()) {
@@ -116,5 +122,38 @@ public class TableauSolver extends IterativeSolver {
 		 */
 		result = SolverResult.Satisfiable;
 		model = candidate.partialModel();
+	}
+	
+	// test method
+	public static void main(String[] args) {
+		if (args.length != 2) {
+			System.err.println("Usage: java ...TableauSolver <sgf-filename> <condition-name>");
+			System.exit(1);
+		}
+		
+		SgfMap sgf;
+		try {
+			sgf = SgfParser.parseSgfFile(args[0]);
+		} catch (IOException e) {
+			System.err.println("Error parsing sgf file " + args[0] + ":");
+			e.printStackTrace();
+			System.exit(1);
+			return; // needed to avoid "uninitialized" error below
+		}
+		
+		GraphCondition cond = sgf.getGraphCondition(args[1]);
+		cond = MakeAlternating.makeAlternating(cond);
+		
+		TableauSolver solver = new TableauSolver(cond);
+		do {
+			solver.step();
+		} while (solver.getResult() == null);
+		System.out.println("Solver result: " + solver.getResult());
+		if (solver.getResult() == SolverResult.Satisfiable) {
+			System.out.println("Model:");
+			SgfWriter w = new SgfWriter(System.out);
+			w.writeMorphism(solver.getModel());
+		}
+		System.exit(0);
 	}
 }

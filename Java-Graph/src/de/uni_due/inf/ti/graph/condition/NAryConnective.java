@@ -117,7 +117,16 @@ public abstract class NAryConnective implements GraphCondition {
 		} else {
 			oldConds = this.conditions.stream();
 		}
-		Stream<GraphCondition> newConds = oldConds.map(cj -> cj.shift(m));
+		Stream<GraphCondition> newConds = oldConds.flatMap(cj -> {
+			GraphCondition cj_shifted = cj.shift(m);
+			if (this instanceof Conjunction && cj_shifted instanceof Conjunction con) {
+				return con.conditions.stream();
+			} else if (this instanceof Disjunction && cj_shifted instanceof Disjunction dis) {
+				return dis.conditions.stream();
+			} else {
+				return Stream.of(cj_shifted);
+			}
+		});
 		return this.newSameType(m.getCodomain(), newConds);
 	}
 
