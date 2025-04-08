@@ -79,7 +79,16 @@ public class TestforPractise {
 		GraphCondition con_con = new Conjunction(con1,con2);
 		GraphCondition con_fA_dis = new ForAll(gempty_gnode, con_dis);
 		GraphCondition con_fA_con = new ForAll(gempty_gnode, con_con);
-
+		
+		GraphCondition con3 = new Existential(gnode_gline, new True(gline));
+		GraphCondition con4 = new Existential(gnode_gline, new False(gline));
+		GraphCondition con5_con = new Conjunction(con3,con4);
+		GraphCondition con6_fA_con = new ForAll(gempty_gnode, con5_con);
+		GraphCondition con7 = new Existential(gempty_gnode, new True(gnode));
+		GraphCondition con8 = new Existential(gempty_gnode, new False(gnode));
+		GraphCondition con9_con = new Conjunction(con7,con8);
+		
+		
 		GraphCondition condition = randomcondition;
 		
 		
@@ -258,10 +267,10 @@ public class TestforPractise {
 		}
 		if(condition instanceof NAryConnective NAc) {
 			List<GraphCondition> childs = NAc.getChildConditions();
-			Map<GraphCondition,List<GraphCondition>> istotal = total_pairs(childs);
 			List<GraphCondition> used = new ArrayList<>();
 			List<GraphCondition> newNacChilds = new ArrayList<>();
-			if(condition instanceof Disjunction Dis) {
+			if(condition instanceof Disjunction Dis) {		
+				Map<GraphCondition,List<GraphCondition>> istotal = total_pairs(childs,true);
 				List<Pair<GraphCondition,List<GraphCondition>>> sorted_pairs = create_sorted_List(istotal);
 				for(Pair<GraphCondition,List<GraphCondition>> pair: sorted_pairs) {
 					if(used.contains(pair.getFirst())) continue;
@@ -294,9 +303,42 @@ public class TestforPractise {
 				return NAc.newSameType(NAc.getOrigin(), newNacChilds);
 			}
 			if(condition instanceof Conjunction Con) {
-				System.out.print("Conjunktion\n");
+				Map<GraphCondition,List<GraphCondition>> istotal = total_pairs(childs,false);
+				List<Pair<GraphCondition,List<GraphCondition>>> sorted_pairs = create_sorted_List(istotal);
+				for(Pair<GraphCondition,List<GraphCondition>> pair: sorted_pairs) {
+					if(used.contains(pair.getFirst())) continue;
+					QuantifiedCondition con = (QuantifiedCondition)pair.getFirst();
+					List<GraphCondition> newConChilds = new ArrayList<>();
+					newConChilds.add(con.getChildCondition());
+					for(GraphCondition reducecon: pair.getSecond()) {
+						if(used.contains(reducecon)) continue;
+						if(reducecon instanceof QuantifiedCondition qc) {
+							if(qc.getChildCondition() instanceof QuantifiedCondition innerqc) {								
+								Morphism m_reducecon_to_con = Morphism.getMatch(qc.getMorphism().getCodomain(), con.getMorphism().getCodomain());
+								System.out.print("Morphism: \n"+ m_reducecon_to_con+"\n");
+								GraphCondition shifted = innerqc.shift(m_reducecon_to_con);
+								System.out.print("shifted: \n"+ shifted+"\n");
+								newConChilds.add(shifted);
+							}
+							if(qc.getChildCondition() instanceof Constant c) {
+								newConChilds.add(c.newSame(con.getMorphism().getCodomain()));
+							}
+							if(qc.getChildCondition() instanceof NAryConnective innerNAc) {
+								newConChilds.add(innerNAc);
+							}
+							used.add(reducecon);
+						}
+					}
+					Conjunction newCon = new Conjunction(newConChilds);
+					newNacChilds.add(con.newSameType(con.getMorphism(), newCon));
+					used.add(pair.getFirst());
+				}
+				for(GraphCondition not_used:childs) {
+					if(!used.contains(not_used)) newNacChilds.add(not_used);
+				}
+				return NAc.newSameType(NAc.getOrigin(), newNacChilds);
 				
-			}
+			}	
 
 		}
 		
@@ -321,7 +363,7 @@ public class TestforPractise {
 	
 	
 	
-	private static Map<GraphCondition,List<GraphCondition>> total_pairs(List<GraphCondition> childs){
+	private static Map<GraphCondition,List<GraphCondition>> total_pairs(List<GraphCondition> childs, boolean isDisjunktion){
 		Map<GraphCondition,List<GraphCondition>> istotal = new HashMap<>();
 		for(GraphCondition i_con : childs) {
 			for(GraphCondition j_con: childs) {
@@ -331,10 +373,18 @@ public class TestforPractise {
 						&& i_con.getClass().equals(j_con.getClass())) {
 						if(istotal(qc_i.getMorphism(), qc_j.getMorphism())) 
 						{
+							if(isDisjunktion) {					
 							List<GraphCondition> newList = new ArrayList<GraphCondition>();
 							if(istotal.containsKey(i_con)) newList = istotal.get(i_con);
 							newList.add(j_con);
 							istotal.put(i_con, newList);
+							}
+							else {
+								List<GraphCondition> newList = new ArrayList<GraphCondition>();
+								if(istotal.containsKey(j_con)) newList = istotal.get(j_con);
+								newList.add(i_con);
+								istotal.put(j_con, newList);
+							}
 						}					
 					}
 				}
