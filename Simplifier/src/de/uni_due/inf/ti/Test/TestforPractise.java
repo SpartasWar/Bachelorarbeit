@@ -1,6 +1,6 @@
 package de.uni_due.inf.ti.Test;
 
-import de.uni_due.inf.ti.tableaugc.TableauSolver;
+
 import de.uni_due.inf.ti.util.Pair;
 
 import java.util.Map;
@@ -12,420 +12,147 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import de.uni_due.inf.ti.gc_cvc.*;
-import de.uni_due.inf.ti.gcsolvers.*;
-import de.uni_due.inf.ti.gcsolvers.MakeAlternating.DNFUnknownConditionException;
+
 import de.uni_due.inf.ti.graph.Edge;
 import de.uni_due.inf.ti.graph.Graph;
 import de.uni_due.inf.ti.graph.Label;
 import de.uni_due.inf.ti.graph.Morphism;
 import de.uni_due.inf.ti.graph.Node;
-import de.uni_due.inf.ti.graph.condition.Conjunction;
-import de.uni_due.inf.ti.graph.condition.Constant;
-import de.uni_due.inf.ti.graph.condition.Disjunction;
-import de.uni_due.inf.ti.graph.condition.Existential;
-import de.uni_due.inf.ti.graph.condition.False;
-import de.uni_due.inf.ti.graph.condition.ForAll;
-import de.uni_due.inf.ti.graph.condition.GraphCondition;
-import de.uni_due.inf.ti.graph.condition.NAryConnective;
-import de.uni_due.inf.ti.graph.condition.Negation;
-import de.uni_due.inf.ti.graph.condition.QuantifiedCondition;
-import de.uni_due.inf.ti.graph.condition.True;
+import de.uni_due.inf.ti.graph.condition.cospan.CospanCondition;
+import de.uni_due.inf.ti.graph.condition.cospan.CospanCondition.ChildTuple;
+import de.uni_due.inf.ti.graph.condition.cospan.Quantifier;
+import de.uni_due.inf.ti.graph.ext.Cospan;
+import de.uni_due.inf.ti.graph.ext.PushoutComplement;
+import de.uni_due.inf.ti.graph.ext.Square;
 import de.uni_due.inf.ti.graph.io.SgfWriter;
 
 public class TestforPractise {
 
 	public static void main(String[] args) {
-			
-		GraphCondition randomcondition = RandomGraph.randomCondition();
-		
 		Graph gempty = new Graph();
-		Graph gnode = new Graph();
-		gnode.addNode();
-		Graph gline = new Graph();
-		Node n1 = gline.addNode();
-		Node n2 = gline.addNode();
-		gline.addEdge(new Label("A"), n1,n2);
-		Graph glineloop = new Graph();
-		n1 = glineloop.addNode();
-		n2 = glineloop.addNode();
-		glineloop.addEdge(new Label("A"), n1,n2);
-		glineloop.addEdge(new Label("B"), n1,n1);
-		Graph glineline = new Graph();
-		n1 = glineline.addNode();
-		n2 = glineline.addNode();
-		Node n3 = glineline.addNode();
-		glineline.addEdge(new Label("A"), n1,n2);
-		glineline.addEdge(new Label("C"), n2,n3);
-		Graph glinelineback = new Graph();
-		n1 = glinelineback.addNode();
-		n2 = glinelineback.addNode();
-		n3 = glinelineback.addNode();
-		glinelineback.addEdge(new Label("A"), n1,n2);
-		glinelineback.addEdge(new Label("C"), n2,n3);
-		glinelineback.addEdge(new Label("D"), n3,n2);
-
-		Morphism gempty_gnode = Morphism.getMatch(gempty, gnode);
-		Morphism gnode_gline = Morphism.getMatch(gnode, gline);
-		Morphism gline_glineloop = Morphism.getMatch(gline, glineloop);
-		Morphism gnode_glineline = Morphism.getMatch(gnode, glineline);
-		Morphism glineline_glinelineback = Morphism.getMatch(glineline, glinelineback);
-		
-		GraphCondition con1_1 = new ForAll(gline_glineloop, new False(glineloop));
-		GraphCondition con1 = new Existential(gnode_gline,con1_1);
-		GraphCondition con2_1 = new ForAll(glineline_glinelineback, new False(glinelineback));
-		GraphCondition con2 = new Existential(gnode_glineline, con2_1);
-		GraphCondition con_dis = new Disjunction(con1,con2);
-		GraphCondition con_con = new Conjunction(con1,con2);
-		GraphCondition con_fA_dis = new ForAll(gempty_gnode, con_dis);
-		GraphCondition con_fA_con = new ForAll(gempty_gnode, con_con);
-		
-		GraphCondition con3 = new Existential(gnode_gline, new True(gline));
-		GraphCondition con4 = new Existential(gnode_gline, new False(gline));
-		GraphCondition con5_con = new Conjunction(con3,con4);
-		GraphCondition con6_fA_con = new ForAll(gempty_gnode, con5_con);
-		GraphCondition con7 = new Existential(gempty_gnode, new True(gnode));
-		GraphCondition con8 = new Existential(gempty_gnode, new False(gnode));
-		GraphCondition con9_con = new Conjunction(con7,con8);
+		Graph gAline = new Graph();
+		Node n1 = gAline.addNode();
+		Node n2 = gAline.addNode();
+		Graph twoNodes = gAline.clone();
+		gAline.addEdge(new Label("A"), n1,n2);
+		Graph gABLine = new Graph();
+		n1 = gABLine.addNode();
+		n2 = gABLine.addNode();
+		Node n3 = gABLine.addNode();
+		Graph treeNodes = gABLine.clone();
+		gABLine.addEdge(new Label("A"), n1,n2);
+		gABLine.addEdge(new Label("B"), n2,n3);
+		Morphism m_emptym_gAline = Morphism.getMatch(gempty, gAline, true);
+		Morphism m_twoNodes_gAline = Morphism.getMatch(twoNodes, gAline, true);
+		Morphism m_emptym_gABline = Morphism.getMatch(gempty, gABLine, true);
+		Morphism m_treeNodes_gABline = Morphism.getMatch(treeNodes, gABLine, true);
+		Morphism m_gAline_gABline = Morphism.getMatch(gAline, gABLine, true);
 		
 		
-		GraphCondition condition = randomcondition;
+		Cospan c1 = new Cospan(m_emptym_gAline, m_twoNodes_gAline);
+		Cospan c2 = new Cospan(m_emptym_gABline, m_treeNodes_gABline);
+		CospanCondition False_gAline = CospanCondition.False(c1);
+		CospanCondition False_gABline = CospanCondition.False(c2);
+		ChildTuple ct1 = new ChildTuple(c1, False_gAline);
+		ChildTuple ct2 = new ChildTuple(c2, False_gABline);
+		CospanCondition con1 = new CospanCondition(gempty, Quantifier.Forall, ct1);
+		CospanCondition con2 = new CospanCondition(gempty, Quantifier.Forall, ct2);
+		CospanCondition Conjunktion = CospanCondition.And(con1,con2);
+		CospanCondition Conjunktion2 = CospanCondition.And(Conjunktion,con1);
+		//System.out.print(Conjunktion2+"\n");
+		
+		System.out.print(Simplify(Conjunktion) + "\n");
 		
 		
-		System.out.print("RandomCondition: \n"+ condition +"\n");
-		GraphCondition condition_Final = simplifiy_Condition(condition);
-		System.out.print("Simplify Final: \n"+ condition_Final+"\n");
-		
-		if(!MakeAlternating.isAlternating(condition_Final)) {
-			condition_Final = MakeAlternating.makeAlternating(condition_Final);
-		}
-		System.out.print("Alternating Final: \n"+ condition_Final+"\n");
-		
-		if(!MakeAlternating.isAlternating(condition)) {
-			 condition = MakeAlternating.makeAlternating(condition);
-		}
-		
-		System.out.print("Alternating: \n"+ condition +"\n");
-		
-		TableauSolver solver_opti = new TableauSolver(condition_Final);
-		do {
-			solver_opti.step();
-		} while (solver_opti.getResult() == null);
-		System.out.println("Solver_opti result: " + solver_opti.getResult());
-		if (solver_opti.getResult() == SolverResult.Satisfiable) {
-			System.out.println("Model:");
-			SgfWriter w = new SgfWriter(System.out);
-			w.writeMorphism(solver_opti.getModel());
-		}
-		
-		
-		
-		TableauSolver solver = new TableauSolver(condition);
-		do {
-			solver.step();
-		} while (solver.getResult() == null);
-		System.out.println("Solver result: " + solver.getResult());
-		if (solver.getResult() == SolverResult.Satisfiable) {
-			System.out.println("Model:");
-			SgfWriter w = new SgfWriter(System.out);
-			w.writeMorphism(solver.getModel());
-		}
-
 	}
 	
-	public static GraphCondition SimplificationQuantified(GraphCondition condition) {
-		if(condition instanceof QuantifiedCondition qc) {
-			Morphism m = qc.getMorphism();
-			if(m.isIsomorphism()) {
-				return eliminateIsomorphism(m, qc.getChildCondition());
-			}		
-		
-			if(condition instanceof Existential Exc) {
-				GraphCondition inner = Exc.getChildCondition();
-				if(inner instanceof False) {
-					return new False(Exc.getOrigin());
+	
+	
+	
+	
+	
+	
+	
+	/**
+	 * Needs a condition of the form 
+	 * @param con1 ForAll c1 GC or Exist c1 GC
+	 * @param con2 ForAll c2 GC or Exist c2 GC
+	 * @return returns a List of {@link CospanCondition}s, if it was possible to simplify the list contains only one Object
+	 */
+	public static List<CospanCondition> simplify_Leaf(CospanCondition condition1,CospanCondition condition2) {
+		List<CospanCondition> NewConList = new ArrayList<>();
+		if(condition1.getChildren().size() == 1 && condition2.getChildren().size() == 1 && condition1.getQuantifier() == condition2.getQuantifier()) {
+			ChildTuple ct1 = condition1.getChildren().getFirst();
+			ChildTuple ct2 = condition2.getChildren().getFirst();	
+			Cospan c1 = ct1.getMorphism();
+			Cospan c2 = ct2.getMorphism();			
+			CospanCondition con1 = ct1.getChildCondition();
+			CospanCondition con2 = ct2.getChildCondition();
+			
+			if(con1.getQuantifier() == con2.getQuantifier()  && con1.getChildren().size() == 0 && con2.getChildren().size() == 0) {
+				boolean isSubGraph = false;
+				boolean from_c1_to_c2 = false;
+				if(check_subgraph(c1, c2)) {
+					isSubGraph = true;
+					from_c1_to_c2 = true;
 				}
-				if(inner instanceof Existential innerExc) {
-					return Exc.newSameType(Exc.getMorphism().compose(innerExc.getMorphism()), innerExc.getChildCondition());
+				if(check_subgraph(c2, c1)) {					
+					isSubGraph = true;
 				}
-				if(inner instanceof Disjunction Dis) {
-					List<GraphCondition> newChilds= new ArrayList<GraphCondition>();
-					for(GraphCondition ininner: Dis.getChildConditions()) {
-						newChilds.add(SimplificationQuantified(new Existential(Exc.getMorphism(), ininner)));
+				if(isSubGraph) {
+					if(condition1.getQuantifier() == Quantifier.Forall) {
+						if(from_c1_to_c2) NewConList.add(condition1);
+						if(!from_c1_to_c2) NewConList.add(condition2);
+						return NewConList;
 					}
-					return Dis.newSameType(Exc.getOrigin(), newChilds);
+					else {
+						if(from_c1_to_c2) NewConList.add(condition2);
+						if(!from_c1_to_c2) NewConList.add(condition1);
+						return NewConList;
+					}
 				}
 			}
-			if(condition instanceof ForAll FoA) {
-				GraphCondition inner = FoA.getChildCondition();
-				if(inner instanceof True) {
-					return new True(FoA.getOrigin());
-				}
-				if(inner instanceof ForAll innerFoA) {
-					return FoA.newSameType(FoA.getMorphism().compose(innerFoA.getMorphism()), innerFoA.getChildCondition());
-				}
-				if(inner instanceof Conjunction Con) {
-					List<GraphCondition> newChilds= new ArrayList<GraphCondition>();
-					for(GraphCondition ininner: Con.getChildConditions()) {
-						newChilds.add(SimplificationQuantified(new Existential(FoA.getMorphism(), ininner)));
-					}
-					return Con.newSameType(FoA.getOrigin(), newChilds);
-				}
-			}
+			
 		}
+		NewConList.add(condition1);
+		NewConList.add(condition2);	
+		return NewConList;
+	}
+	
+	
+	/**
+	 * @return returns true if c1 is subGraph of c2
+	 */
+	public static boolean check_subgraph(Cospan c1,Cospan c2) {
+		Morphism m1 = Morphism.getMatch(c1.getMiddleGraph(),c2.getMiddleGraph(), true);	
+		if(m1 == null) return false;
+		Square s1 = PushoutComplement.compute(c1.getRightMorphism(), m1);
+		if(s1 == null || Morphism.getMatch(c2.getRightGraph(), s1.getRightGraph(), true) == null) return false;		
+		return true;
+	}
+	
+	public static CospanCondition Simplify(CospanCondition condition) {
+		List<ChildTuple> childtuples = condition.getChildren();
+		if(childtuples.size() == 0) return condition;
+		if(childtuples.size() == 1) return new CospanCondition(condition.getOrigin(),condition.getQuantifier(),new ChildTuple(childtuples.getFirst().getMorphism(),Simplify(childtuples.getFirst().getChildCondition())));
+		if(childtuples.size() > 1) return new CospanCondition(condition.getOrigin(),condition.getQuantifier(),applysimplify_Leaf(childtuples));
 		return condition;
 	}
 	
 	
-	
-	public static GraphCondition SimplificationNary(GraphCondition condition) {	
-		// ^ / and
-		if(condition instanceof Conjunction Con) {
-			List<GraphCondition> newChilds= new ArrayList<GraphCondition>();
-			for(GraphCondition inner: Con.getChildConditions()) {
-				if(inner instanceof False innerf) {
-					return innerf.newSame(Con.getOrigin());
-				}
-				else if(inner instanceof Conjunction innerCon){
-					newChilds.addAll(innerCon.getChildConditions());
-				}
-				else {
-					newChilds.add(inner);
+	public static List<ChildTuple> applysimplify_Leaf(List<ChildTuple> childs){
+		List<ChildTuple> newChilds = new ArrayList<>();
+		for(int i = 0; i < childs.size();i++) {
+			for(int j = i; j < childs.size();j++) {
+				if(i==j) continue;
+				List<CospanCondition> leaf_opti = simplify_Leaf(childs.get(i).getChildCondition(),childs.get(j).getChildCondition());
+				for(CospanCondition con: leaf_opti) {
+					ChildTuple newChild = new ChildTuple(childs.get(i).getMorphism(), Simplify(con));
+					if(!newChilds.contains(newChild)) newChilds.add(newChild);
 				}
 			}
-			if(newChilds.size() == 0) return new True(Con.getOrigin());
-			return Con.newSameType(Con.getOrigin(), newChilds);
-		}
-		// v / or
-		if(condition instanceof Disjunction Dis) {
-			List<GraphCondition> newChilds= new ArrayList<GraphCondition>();
-			for(GraphCondition inner: Dis.getChildConditions()) {
-				if(inner instanceof True innert) {
-					return innert.newSame(Dis.getOrigin());
-				}
-				else if(inner instanceof Disjunction innerDis) {
-					newChilds.addAll(innerDis.getChildConditions());
-				}
-				else {
-					newChilds.add(inner);
-				}
-			}
-			if(newChilds.size() == 0) return new False(Dis.getOrigin());
-			return Dis.newSameType(Dis.getOrigin(), newChilds);
-		}
-		
-		return condition;
-	}
-	
-	
-	public static GraphCondition going_through_Condition(GraphCondition condition) {
-		
-		if(condition instanceof Constant) return condition;
-		if(condition instanceof NAryConnective NAc) {
-			// Abzweigungen um verschiedene Pfade zu erstellen
-			List<GraphCondition> newChilds= new ArrayList<GraphCondition>();
-			for(GraphCondition inner: NAc.getChildConditions()) {
-				newChilds.add(going_through_Condition(inner));
-			}
-			return SimplificationNary(NAc.newSameType(NAc.getOrigin(), newChilds));
-		}
-		if(condition instanceof QuantifiedCondition qc) {
-			return SimplificationQuantified(qc.newSameType(qc.getMorphism(), going_through_Condition(qc.getChildCondition())));
-		}		
-		if(condition instanceof Negation Nc) {
-			GraphCondition Nccon = Nc.getChildCondition();
-			if(Nccon instanceof QuantifiedCondition qc) {
-				return going_through_Condition(qc.newOppositeType(qc.getMorphism(),new Negation(qc.getChildCondition())));
-			}
-			if(Nccon instanceof NAryConnective NAc) {
-				List<GraphCondition> newChilds= new ArrayList<GraphCondition>();
-				for(GraphCondition inner: NAc.getChildConditions()) {
-					newChilds.add(new Negation(inner));
-				}
-				return going_through_Condition(NAc.newOppositeType(NAc.getOrigin(), newChilds));
-			}
-			if(Nccon instanceof Constant c) {
-				return c instanceof True ? new False(c.getOrigin()): new True(c.getOrigin());
-			}
-			if(Nccon instanceof Negation n) {
-				return going_through_Condition(n.getChildCondition());
-			}
-			return new Negation(going_through_Condition(Nc.getChildCondition()));
-		}
-		return condition;
-	}
-	
-	
-	
-	public static GraphCondition complex_simplified(GraphCondition condition) {
-		if(condition instanceof Constant) return condition;
-		if(condition instanceof QuantifiedCondition qc) {
-			return qc.newSameType(qc.getMorphism(),complex_simplified(qc.getChildCondition()));
-		}
-		if(condition instanceof Negation Nc) {
-			return new Negation(complex_simplified(Nc.getChildCondition()));
-		}
-		if(condition instanceof NAryConnective NAc) {
-			List<GraphCondition> childs = NAc.getChildConditions();
-			List<GraphCondition> used = new ArrayList<>();
-			List<GraphCondition> newNacChilds = new ArrayList<>();
-			if(condition instanceof Disjunction Dis) {		
-				Map<GraphCondition,List<GraphCondition>> istotal = total_pairs(childs,true);
-				List<Pair<GraphCondition,List<GraphCondition>>> sorted_pairs = create_sorted_List(istotal);
-				for(Pair<GraphCondition,List<GraphCondition>> pair: sorted_pairs) {
-					if(used.contains(pair.getFirst())) continue;
-					QuantifiedCondition con = (QuantifiedCondition)pair.getFirst();
-					List<GraphCondition> newDisChilds = new ArrayList<>();
-					newDisChilds.add(con.getChildCondition());
-					for(GraphCondition reducecon: pair.getSecond()) {
-						if(used.contains(reducecon)) continue;
-						if(reducecon instanceof QuantifiedCondition qc) {
-							if(qc.getChildCondition() instanceof QuantifiedCondition innerqc) {
-								newDisChilds.add(innerqc.newSameType(Morphism.getMatch(con.getMorphism().getCodomain(), innerqc.getMorphism().getCodomain()),
-										innerqc.getChildCondition()));
-							}
-							if(qc.getChildCondition() instanceof Constant c) {
-								newDisChilds.add(c.newSame(con.getMorphism().getCodomain()));
-							}
-							if(qc.getChildCondition() instanceof NAryConnective innerNAc) {
-								newDisChilds.add(innerNAc);
-							}
-							used.add(reducecon);
-						}
-					}
-					Disjunction newDis = new Disjunction(newDisChilds);
-					newNacChilds.add(con.newSameType(con.getMorphism(), newDis));
-					used.add(pair.getFirst());
-				}
-				for(GraphCondition not_used:childs) {
-					if(!used.contains(not_used)) newNacChilds.add(not_used);
-				}
-				return NAc.newSameType(NAc.getOrigin(), newNacChilds);
-			}
-			if(condition instanceof Conjunction Con) {
-				Map<GraphCondition,List<GraphCondition>> istotal = total_pairs(childs,false);
-				List<Pair<GraphCondition,List<GraphCondition>>> sorted_pairs = create_sorted_List(istotal);
-				for(Pair<GraphCondition,List<GraphCondition>> pair: sorted_pairs) {
-					if(used.contains(pair.getFirst())) continue;
-					QuantifiedCondition con = (QuantifiedCondition)pair.getFirst();
-					List<GraphCondition> newConChilds = new ArrayList<>();
-					newConChilds.add(con.getChildCondition());
-					for(GraphCondition reducecon: pair.getSecond()) {
-						if(used.contains(reducecon)) continue;
-						if(reducecon instanceof QuantifiedCondition qc) {
-							if(qc.getChildCondition() instanceof QuantifiedCondition innerqc) {								
-								Morphism m_reducecon_to_con = Morphism.getMatch(qc.getMorphism().getCodomain(), con.getMorphism().getCodomain());
-								System.out.print("Morphism: \n"+ m_reducecon_to_con+"\n");
-								GraphCondition shifted = innerqc.shift(m_reducecon_to_con);
-								System.out.print("shifted: \n"+ shifted+"\n");
-								newConChilds.add(shifted);
-							}
-							if(qc.getChildCondition() instanceof Constant c) {
-								newConChilds.add(c.newSame(con.getMorphism().getCodomain()));
-							}
-							if(qc.getChildCondition() instanceof NAryConnective innerNAc) {
-								newConChilds.add(innerNAc);
-							}
-							used.add(reducecon);
-						}
-					}
-					Conjunction newCon = new Conjunction(newConChilds);
-					newNacChilds.add(con.newSameType(con.getMorphism(), newCon));
-					used.add(pair.getFirst());
-				}
-				for(GraphCondition not_used:childs) {
-					if(!used.contains(not_used)) newNacChilds.add(not_used);
-				}
-				return NAc.newSameType(NAc.getOrigin(), newNacChilds);
-				
-			}	
-
-		}
-		
-		return condition;
-	}
-	
-	
-	private static List<Pair<GraphCondition,List<GraphCondition>>> create_sorted_List(Map<GraphCondition,List<GraphCondition>> istotal){
-		List<Pair<GraphCondition,List<GraphCondition>>> result = new ArrayList<>();
-		for(GraphCondition key: istotal.keySet()) {
-			result.add(new Pair<GraphCondition, List<GraphCondition>>(key, istotal.get(key)));
-		}
-		result.sort((obj1,obj2) -> {
-			Pair<GraphCondition,List<GraphCondition>> p1 = obj1;
-			Pair<GraphCondition,List<GraphCondition>> p2 = obj2;
-			if(p1.getSecond().size() < p2.getSecond().size()) return 1;
-			if(p1.getSecond().size() > p2.getSecond().size()) return -1;
-			return 0;
-		});		
-		return result;
-	}
-	
-	
-	
-	private static Map<GraphCondition,List<GraphCondition>> total_pairs(List<GraphCondition> childs, boolean isDisjunktion){
-		Map<GraphCondition,List<GraphCondition>> istotal = new HashMap<>();
-		for(GraphCondition i_con : childs) {
-			for(GraphCondition j_con: childs) {
-				if(!i_con.equals(j_con)){
-					if(i_con instanceof QuantifiedCondition qc_i 
-						&& j_con instanceof QuantifiedCondition qc_j  
-						&& i_con.getClass().equals(j_con.getClass())) {
-						if(istotal(qc_i.getMorphism(), qc_j.getMorphism())) 
-						{
-							if(isDisjunktion) {					
-							List<GraphCondition> newList = new ArrayList<GraphCondition>();
-							if(istotal.containsKey(i_con)) newList = istotal.get(i_con);
-							newList.add(j_con);
-							istotal.put(i_con, newList);
-							}
-							else {
-								List<GraphCondition> newList = new ArrayList<GraphCondition>();
-								if(istotal.containsKey(j_con)) newList = istotal.get(j_con);
-								newList.add(i_con);
-								istotal.put(j_con, newList);
-							}
-						}					
-					}
-				}
-			}
-		}
-		return istotal;
-	}
-	
-	
-	private static boolean istotal(Morphism m1, Morphism m2) {
-		Morphism m3 = Morphism.getMatch(m1.getCodomain(), m2.getCodomain(), true);
-		if(m3 != null && m3.isTotal() && m3.isInjective()) return true;
-		return false;
-	}
-	
-	public static GraphCondition simplifiy_Condition(GraphCondition condition) {
-		GraphCondition lastcon = null;
-		GraphCondition currcon = condition;
-		while(!currcon.equals(lastcon)) {
-			lastcon = currcon;
-			currcon = going_through_Condition(currcon);
-			currcon = complex_simplified(currcon);
-			//System.out.print("Current Simpli \n" + currcon + "\n");
-		}		
-		return currcon;
-	}
-	
-	private static GraphCondition eliminateIsomorphism(Morphism morphism, GraphCondition child) {
-		if (child instanceof Constant) {
-			return ((Constant) child).newSame(morphism.getDomain());
-		} else if (child instanceof Negation childN) {
-			return new Negation(eliminateIsomorphism(morphism, childN.getChildCondition()));
-		} else if (child instanceof QuantifiedCondition childQ) {
-			return childQ.newSameType(morphism.compose(childQ.getMorphism()), childQ.getChildCondition());
-		} else if (child instanceof NAryConnective childD) {
-			Stream<GraphCondition> nchildren = childD.getChildConditions().stream()
-					.map(c -> eliminateIsomorphism(morphism, c));
-			return childD.newSameType(morphism.getDomain(), nchildren);
-		} else {
-			throw new DNFUnknownConditionException(child, "isomorphism elimination");
-		}
+		}	
+		return newChilds;
 	}
 	
 }
