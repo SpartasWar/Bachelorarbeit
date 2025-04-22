@@ -3,16 +3,10 @@ package de.uni_due.inf.ti.Test;
 
 import de.uni_due.inf.ti.util.Pair;
 
-import java.util.Map;
-import java.util.stream.Stream;
-
-
 import java.util.List;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 
-import de.uni_due.inf.ti.graph.Edge;
 import de.uni_due.inf.ti.graph.Graph;
 import de.uni_due.inf.ti.graph.Label;
 import de.uni_due.inf.ti.graph.Morphism;
@@ -23,7 +17,6 @@ import de.uni_due.inf.ti.graph.condition.cospan.Quantifier;
 import de.uni_due.inf.ti.graph.ext.Cospan;
 import de.uni_due.inf.ti.graph.ext.PushoutComplement;
 import de.uni_due.inf.ti.graph.ext.Square;
-import de.uni_due.inf.ti.graph.io.SgfWriter;
 
 public class TestforPractise {
 
@@ -76,7 +69,7 @@ public class TestforPractise {
 	 * Needs a condition of the form 
 	 * @param con1 ForAll c1 GC or Exist c1 GC
 	 * @param con2 ForAll c2 GC or Exist c2 GC
-	 * @return returns a List of {@link CospanCondition}s, if it was possible to simplify the list contains only one Object
+	 * 
 	 */
 	public static Pair<List<CospanCondition>, List<CospanCondition>> simplify_Leaf(CospanCondition condition1,CospanCondition condition2) {
 		List<CospanCondition> NewConList = new ArrayList<>();
@@ -104,6 +97,7 @@ public class TestforPractise {
 				newCon2 = condition1;
 			}			
 			if(from_c1_to_c2 && from_c2_to_c1 && con1.getQuantifier() == con2.getQuantifier()) {
+				// Quantor c1 GC and/or Quantor c2 GC with c1 = c2
 				if(!leaf_Condition) {
 					List<ChildTuple> NewChilds = con1.getChildren();
 					 NewChilds.addAll(con2.getChildren());
@@ -113,15 +107,18 @@ public class TestforPractise {
 					 RemovedList.add(condition2);
 					 RemovedList.add(condition1);
 				}
+				// Quantor c1 constant and/or Quantor c2 constant with c1 = c2
 				else {
 					NewConList.add(newCon1);
 				}
 			}
 			else if(from_c1_to_c2 || from_c2_to_c1) {
+				// ForAll con1 false and ForAll con2 false
 				if(condition1.getQuantifier() == Quantifier.Forall) {
 					NewConList.add(newCon1);
 					RemovedList.add(newCon2);
 				}
+				// Exist con1 true or Exist con2 true
 				else {
 					NewConList.add(newCon2);
 					RemovedList.add(newCon1);
