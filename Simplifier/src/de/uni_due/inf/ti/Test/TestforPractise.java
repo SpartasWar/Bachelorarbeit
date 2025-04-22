@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 
-
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,11 +56,11 @@ public class TestforPractise {
 		ChildTuple ct2 = new ChildTuple(c2, False_gABline);
 		CospanCondition con1 = new CospanCondition(gempty, Quantifier.Forall, ct1);
 		CospanCondition con2 = new CospanCondition(gempty, Quantifier.Forall, ct2);
-		CospanCondition Conjunktion = CospanCondition.And(con1,con2);
+		CospanCondition Conjunktion = CospanCondition.And(con1,con2,con1,con2);
 		CospanCondition Conjunktion2 = CospanCondition.And(Conjunktion,con1);
 		//System.out.print(Conjunktion2+"\n");
-		
-		System.out.print(Simplify(Conjunktion) + "\n");
+		System.out.print("Conjunktion: \n" + Conjunktion + "\n" );
+		System.out.print("Simplify: \n" + Simplify(Conjunktion) + "\n");
 		
 		
 	}
@@ -79,46 +78,67 @@ public class TestforPractise {
 	 * @param con2 ForAll c2 GC or Exist c2 GC
 	 * @return returns a List of {@link CospanCondition}s, if it was possible to simplify the list contains only one Object
 	 */
-	public static List<CospanCondition> simplify_Leaf(CospanCondition condition1,CospanCondition condition2) {
+	public static Pair<List<CospanCondition>, List<CospanCondition>> simplify_Leaf(CospanCondition condition1,CospanCondition condition2) {
 		List<CospanCondition> NewConList = new ArrayList<>();
+		List<CospanCondition> RemovedList = new ArrayList<>();
 		if(condition1.getChildren().size() == 1 && condition2.getChildren().size() == 1 && condition1.getQuantifier() == condition2.getQuantifier()) {
 			ChildTuple ct1 = condition1.getChildren().getFirst();
 			ChildTuple ct2 = condition2.getChildren().getFirst();	
 			Cospan c1 = ct1.getMorphism();
 			Cospan c2 = ct2.getMorphism();			
 			CospanCondition con1 = ct1.getChildCondition();
-			CospanCondition con2 = ct2.getChildCondition();
-			
-			if(con1.getQuantifier() == con2.getQuantifier()  && con1.getChildren().size() == 0 && con2.getChildren().size() == 0) {
-				boolean isSubGraph = false;
-				boolean from_c1_to_c2 = false;
-				if(check_subgraph(c1, c2)) {
-					isSubGraph = true;
-					from_c1_to_c2 = true;
+			CospanCondition con2 = ct2.getChildCondition();		
+			boolean leaf_Condition = con1.getChildren().size() == 0 && con2.getChildren().size() == 0;
+			boolean from_c1_to_c2 = false;
+			boolean from_c2_to_c1 = false;
+			CospanCondition newCon1 = null; // wird nie passieren!
+			CospanCondition newCon2 = null; // wird nie passieren!
+			if(check_subgraph(c1, c2)) {
+				from_c1_to_c2 = true;
+				newCon1 = condition1;
+				newCon2 = condition2;
+			}
+			if(check_subgraph(c2, c1)) {					
+				from_c2_to_c1 = true;
+				newCon1 = condition2;
+				newCon2 = condition1;
+			}			
+			if(from_c1_to_c2 && from_c2_to_c1 && con1.getQuantifier() == con2.getQuantifier()) {
+				if(!leaf_Condition) {
+					List<ChildTuple> NewChilds = con1.getChildren();
+					 NewChilds.addAll(con2.getChildren());
+					 CospanCondition newUnderCon = new CospanCondition(con1.getOrigin(),con1.getQuantifier(),NewChilds);
+					 ChildTuple nct1 = new ChildTuple(c2, newUnderCon);
+					 NewConList.add(new CospanCondition(condition1.getOrigin(),condition1.getQuantifier(),nct1));
+					 RemovedList.add(condition2);
+					 RemovedList.add(condition1);
 				}
-				if(check_subgraph(c2, c1)) {					
-					isSubGraph = true;
-				}
-				if(isSubGraph) {
-					if(condition1.getQuantifier() == Quantifier.Forall) {
-						if(from_c1_to_c2) NewConList.add(condition1);
-						if(!from_c1_to_c2) NewConList.add(condition2);
-						return NewConList;
-					}
-					else {
-						if(from_c1_to_c2) NewConList.add(condition2);
-						if(!from_c1_to_c2) NewConList.add(condition1);
-						return NewConList;
-					}
+				else {
+					NewConList.add(newCon1);
 				}
 			}
-			
+			else if(from_c1_to_c2 || from_c2_to_c1) {
+				if(condition1.getQuantifier() == Quantifier.Forall) {
+					NewConList.add(newCon1);
+					RemovedList.add(newCon2);
+				}
+				else {
+					NewConList.add(newCon2);
+					RemovedList.add(newCon1);
+				}
+			}
+			else {
+				NewConList.add(condition1);
+				NewConList.add(condition2);
+			}
 		}
-		NewConList.add(condition1);
-		NewConList.add(condition2);	
-		return NewConList;
+		else {
+			NewConList.add(condition1);
+			NewConList.add(condition2);
+		}
+		Pair<List<CospanCondition>, List<CospanCondition>> result = new Pair<>(NewConList,RemovedList);
+		return result;
 	}
-	
 	
 	/**
 	 * @return returns true if c1 is subGraph of c2
@@ -142,16 +162,23 @@ public class TestforPractise {
 	
 	public static List<ChildTuple> applysimplify_Leaf(List<ChildTuple> childs){
 		List<ChildTuple> newChilds = new ArrayList<>();
+		List<CospanCondition> newCons = new ArrayList<>();
+		List<CospanCondition> removedCon = new ArrayList<>();
 		for(int i = 0; i < childs.size();i++) {
 			for(int j = i; j < childs.size();j++) {
 				if(i==j) continue;
-				List<CospanCondition> leaf_opti = simplify_Leaf(childs.get(i).getChildCondition(),childs.get(j).getChildCondition());
-				for(CospanCondition con: leaf_opti) {
-					ChildTuple newChild = new ChildTuple(childs.get(i).getMorphism(), Simplify(con));
-					if(!newChilds.contains(newChild)) newChilds.add(newChild);
-				}
+				Pair<List<CospanCondition>, List<CospanCondition>> leaf_opti = simplify_Leaf(childs.get(i).getChildCondition(),childs.get(j).getChildCondition());
+				removedCon.addAll(leaf_opti.getSecond());
+				newCons.addAll(leaf_opti.getFirst());
 			}
 		}	
+		for(CospanCondition con: newCons) {
+			Graph origin = con.getOrigin();
+			Morphism idO = Morphism.createIdentity(origin);
+			Cospan id = new Cospan(idO, idO);
+			ChildTuple newChild = new ChildTuple(id, Simplify(con));
+			if(!newChilds.contains(newChild) && !removedCon.contains(con)) newChilds.add(newChild);
+		}
 		return newChilds;
 	}
 	
