@@ -1,0 +1,853 @@
+/* 
+ * Copyright (c) 2013-2014, H.J. Sander Bruggink
+ * Copyright (c) 2013-2014, University of Duisburg-Essen
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *   - Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   - Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *   - Neither the names of its copyright holder(s) nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+options
+{
+	JDK_VERSION = "1.7";
+	static = false;
+}
+
+PARSER_BEGIN(SgfParser)
+package de.uni_due.inf.ti.graph.io;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.FileReader;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import de.uni_due.inf.ti.graph.Graph;
+import de.uni_due.inf.ti.graph.condition.cospan.Quantifier;
+import de.uni_due.inf.ti.graph.io.SgfTerm.GraphDefTerm;
+import de.uni_due.inf.ti.graph.io.SgfTerm.IfGraphDefTerm;
+import de.uni_due.inf.ti.graph.io.SgfTerm.MapstoTerm;
+import de.uni_due.inf.ti.graph.io.SgfTerm.CospanConditionTupleTerm;
+import de.uni_due.inf.ti.graph.io.SgfTerm.RefTerm;
+
+@SuppressWarnings("all")
+public class SgfParser {
+	/**
+	 * Parses a graph definition from an input stream.
+	 *
+	 * @param in
+	 *      reader from which the graph definition is read
+	 * @returns
+	 *      graph which is parsed from in
+	 * @throws NullPointerException
+	 *      when in is null
+	 * @throws IOException
+	 *      when a parse or IO error occurs
+	 */
+	public static Graph parseGraph(Reader in) throws IOException {
+		if (in == null) throw new NullPointerException();
+
+		SgfParser parser = new SgfParser(in);
+		try {
+			SgfTerm term = parser.graphFile();
+			return SgfBuilder.termToGraph(term);
+		} catch (ParseException e) {
+			throw new IOException("Not an SGF graph file.", e);
+		} catch (SgfBuildException e) {
+			throw new IOException("Not an SGF graph file.", e);
+		}
+	}
+
+	/**
+	 * Parses a collection of named objects from an input stream. The named
+	 * objects are returned as a map which maps a name to the object with
+	 * that name.
+	 *
+	 * @param in
+	 *      reader from which the graph definition is read
+	 * @returns
+	 *      objects which are parsed from the input
+	 * @throws NullPointerException
+	 *      when in is null
+	 * @throws IOException
+	 *      when a parse or IO error occurs
+	 */
+	public static SgfMap parseSgfFile(Reader in) throws IOException {
+		if (in == null) throw new NullPointerException();
+
+		SgfParser parser = new SgfParser(in);
+		try {
+			List<SgfTerm> defs = parser.sgfFile();
+			return new SgfMap(SgfBuilder.termsToObjects(defs));
+		} catch (ParseException e) {
+			throw new IOException("Not a correct SGF file.", e);
+		} catch (IllegalArgumentException e){
+			throw new IOException("Not a correct SGF file.", e);
+		} catch (SgfBuildException e) {
+			throw new IOException("Not a correct SGF graph file.", e);
+		}
+	}
+
+	/**
+	 * Parses a collection of named objects from a named file. The named
+	 * objects are returned as a map which maps a name to the object with
+	 * that name.
+	 *
+	 * @param filename
+	 *      filename from which the graph definition is read
+	 * @returns
+	 *      objects which are parsed from the input
+	 * @throws IOException
+	 *      when a parse or IO error occurs
+	 */
+	public static SgfMap parseSgfFile(String filename) throws IOException {
+		@SuppressWarnings("resource") // try-resource kills javacc
+		FileReader in = null;
+		try {
+			in = new FileReader(filename);
+			SgfParser parser = new SgfParser(in);
+			List<SgfTerm> defs = parser.sgfFile();
+			return new SgfMap(SgfBuilder.termsToObjects(defs));
+		} catch (ParseException e) {
+			throw new IOException("Not a correct SGF file.", e);
+		} catch (IllegalArgumentException e){
+			throw new IOException("Not a correct SGF file.", e);
+		} catch (SgfBuildException e) {
+			throw new IOException("Not a correct SGF graph file.", e);
+		} finally {
+			if (in != null) in.close();
+		}
+	}
+}
+PARSER_END(SgfParser)
+
+// -------------------------------------------------------------------------- //
+//                               Tokenizer                                    //
+// -------------------------------------------------------------------------- //
+
+SKIP : { " " | "\r" | "\t" | "\n" }
+
+TOKEN : {
+  < KW_COPY : "copy" >
+| < KW_COSPAN : "cospan" >
+| < KW_EXISTS : "exists" >
+| < KW_FORALL : "forall" >
+| < KW_FROM : "from" >
+| < KW_GRAPH : "graph" >
+| < KW_GTS : "gts" >
+| < KW_IFGRAPH : "ifgraph" >
+| < KW_INITIAL : "initial" >
+| < KW_LEFT : "left" >
+| < KW_MORPHISM : "morphism" > 
+| < KW_NACS : "nacs" >
+| < KW_NODE : "node" >
+| < KW_NOT : "not" >
+| < KW_RIGHT : "right" >
+| < KW_RULE : "rule" >
+| < KW_RULES : "rules" > 
+| < KW_SYSTEM : "system" >
+| < KW_TO : "to" >
+| < KW_TRACE : "trace" > 
+| < KW_TRANS : "transitions" >
+| < KW_TRUE : "true" >
+| < KW_FALSE : "false" >
+| < KW_OVER : "over" >
+| < KW_AND : "and" >
+| < KW_OR : "or" >
+}
+
+TOKEN: {
+  < OP_PAR_OPEN : "(" > 
+| < OP_PAR_CLOSE : ")" >
+| < OP_BRACE_OPEN : "{" >
+| < OP_BRACE_CLOSE : "}" >
+| < OP_BRACKET_OPEN : "[" >
+| < OP_BRACKET_CLOSE : "]" > 
+| < OP_COMMA : "," >
+| < OP_IS : "=">
+| < OP_BINEDGE_START : "--" >
+| < OP_BINEDGE_RIGHT : "->" >
+| < OP_BINEDGE_LEFT : "<-" >
+| < OP_COLON : ":" >
+| < OP_SEMICOLON : ";" >
+| < OP_MAPSTO : "=>" >
+| < OP_MAPSFROM : "<=" >
+}
+
+TOKEN : {
+  < IDENT : (["0"-"9", "A"-"Z", "a"-"z", "@", "_", "."])+ > 
+| < STRING : ( ("\"" (~["\"", "\n", "\r"])* "\"") | ( "'" (~["'", "\n", "\r"])* "'") ) >
+}
+
+SKIP : {
+  < LINE_CMT : "//" (~["\n", "\r"])* ("\n" | "\r" | "\r\n ")? >
+}
+
+MORE : {
+  "/*" : IN_BLOCK_CMT
+}
+
+<IN_BLOCK_CMT> MORE : { 
+  < ~[] >
+}
+
+<IN_BLOCK_CMT> SKIP : {
+  "*/" : DEFAULT
+}
+ 
+
+// -------------------------------------------------------------------------- //
+//                                  Parser                                    //
+// -------------------------------------------------------------------------- //
+
+private RefTerm noKwident() : {
+	Token t;
+	String ident;
+} {
+	t = <IDENT>
+	{ return SgfTerm.createRefTerm(t, t.image); }
+}
+
+private RefTerm ident() : {
+	Token t;
+	String ident;
+} {
+	(
+		  t = <IDENT>      { ident = t.image; }
+		| t = <STRING>     { ident = t.image.substring(1, t.image.length() - 1); }
+		| t = <KW_INITIAL> { ident = "initial"; }
+		| t = <KW_LEFT>    { ident = "left"; }
+		| t = <KW_NACS>    { ident = "nacs"; }
+		| t = <KW_RIGHT>   { ident = "right"; }
+		| t = <KW_RULES>   { ident = "rules"; }
+		| t = <KW_TRANS>   { ident = "transitions"; }
+	)
+	{ return SgfTerm.createRefTerm(t, ident); }
+}
+
+private List<RefTerm> identList() : {
+	List<RefTerm> result = new ArrayList<RefTerm>();
+	RefTerm ident;
+} {
+	<OP_BRACKET_OPEN>
+	(
+	    ident = ident() { result.add(ident); }
+	    ( <OP_COMMA> ( ident = ident() { result.add(ident); } )? )*
+	)?
+	<OP_BRACKET_CLOSE>
+	{ return result; }
+|
+	ident = ident()
+	{ result.add(ident); return result; }
+}
+
+private String nodeRef() : {
+	RefTerm name;
+} {
+	name = ident()
+	{ return name.getName(); }
+}
+
+private SgfTerm nodeDef() : {
+	RefTerm name = null;
+	Token t;
+} {
+	t = <KW_NODE>
+	( name = ident() )?
+	{ return SgfTerm.createNodeDefTerm(t, name == null ? null : name.getName()); }
+}
+
+private List<SgfTerm> edgesDef() : {
+	Token t;
+	RefTerm prelab;
+	RefTerm postlab = null;
+	RefTerm node1, node2;
+	List<SgfTerm> result = new ArrayList<SgfTerm>();
+List<String> nodes;
+}{
+	( LOOKAHEAD(2) ( // binary edge
+		node1 = ident()
+		((
+			t = <OP_BINEDGE_START>
+			prelab = ident()
+			( <OP_COLON> postlab = ident() )?
+			<OP_BINEDGE_RIGHT>
+			node2 = ident()
+			{
+				nodes = new ArrayList<String>();
+				nodes.add(node1.getName());
+				nodes.add(node2.getName());
+				if (postlab == null) {
+					result.add(SgfTerm.createEdgeDefTerm(t,
+						null, prelab.getName(), nodes));
+				} else {
+					result.add(SgfTerm.createEdgeDefTerm(t,
+						prelab.getName(), postlab.getName(), nodes));
+				}
+				node1 = node2;
+			}
+		) | (
+			t = <OP_BINEDGE_LEFT>
+			prelab = ident()
+			( <OP_COLON> postlab = ident() )?
+			<OP_BINEDGE_START>
+			node2 = ident()
+			{
+				nodes = new ArrayList<String>();
+				nodes.add(node2.getName());
+				nodes.add(node1.getName());
+				if (postlab == null) {
+					result.add(SgfTerm.createEdgeDefTerm(t,
+						null, prelab.getName(), nodes));
+				} else {
+					result.add(SgfTerm.createEdgeDefTerm(t,
+						prelab.getName(), postlab.getName(), nodes));
+				}
+				node1 = node2;
+			}
+		))+
+	) | ( // hyperedge
+		prelab = ident()
+		( <OP_COLON> postlab = ident() )?
+		<OP_PAR_OPEN> { nodes = new ArrayList<String>(); }
+		(
+			node1 = ident()
+			{ nodes.add(node1.getName()); }
+			(
+				<OP_COMMA>
+				node1 = ident()
+				{ nodes.add(node1.getName()); }
+			)*
+		)?
+		<OP_PAR_CLOSE>
+		{
+			if (postlab == null) {
+				result.add(SgfTerm.createEdgeDefTerm(prelab.getLine(), prelab.getColumn(),
+					null, prelab.getName(), nodes));
+			} else {
+				result.add(SgfTerm.createEdgeDefTerm(prelab.getLine(), prelab.getColumn(),
+					prelab.getName(), postlab.getName(), nodes));
+			}
+		}
+	))
+	{ return result; }
+}
+
+private void graphDefElement(List<SgfTerm> elems) : {
+	SgfTerm elem;
+	List<SgfTerm> edges;
+} {
+	  (  elem = nodeDef()   { elems.add(elem); } )
+	| ( edges = edgesDef()  { elems.addAll(edges); } )
+}
+
+private GraphDefTerm graphDefBlock(Token t) : {
+	Token q = null;
+	List<SgfTerm> elems = new ArrayList<SgfTerm>();
+} {
+	q = <OP_BRACE_OPEN>
+	{ if (t == null) t = q; }
+	(
+		graphDefElement(elems)
+		( <OP_SEMICOLON> (graphDefElement(elems))? )*
+	)?
+	<OP_BRACE_CLOSE>
+	{ return SgfTerm.createGraphDefTerm(t, elems); }
+}
+
+private GraphDefTerm graphDef() : {
+	Token t;
+	GraphDefTerm result;
+} {
+	t = <KW_GRAPH>
+	result = graphDefBlock(t)
+	{ return result; }
+}
+
+private SgfTerm graph() : {
+	SgfTerm result;
+} {
+	( result = graphDef() | result = ident() )
+	{ return result; }
+}
+
+private IfGraphDefTerm ifGraphDef() : {
+	Token t;
+	List<RefTerm> left;
+	List<RefTerm> right;
+	GraphDefTerm gdt;
+} {
+	t = <KW_IFGRAPH>
+	<OP_BRACE_OPEN>
+	<OP_BRACKET_OPEN> left = identList() <OP_BRACKET_CLOSE>
+	<OP_MAPSTO>
+	gdt = graphDefBlock(null)
+	<OP_MAPSFROM>
+	<OP_BRACKET_OPEN> right = identList() <OP_BRACKET_CLOSE>
+	<OP_BRACE_CLOSE>
+	{ return SgfTerm.createIfGraphDefTerm(
+	      t,
+	      gdt.getElements(),
+	      left, right); }
+}
+
+private MapstoTerm mapsto() : {
+	RefTerm from;
+	RefTerm to;
+} {
+	from = ident()
+	<OP_MAPSTO>
+	to = ident()
+	{ return SgfTerm.createMapstoTerm(from.getLine(), from.getColumn(),
+	      from.getName(), to.getName()); }
+}
+
+private SgfTerm morphismDef() : {
+	Token t;
+	RefTerm fromGraph = null;
+	RefTerm toGraph = null;
+	MapstoTerm map;
+	List<MapstoTerm> pairs = new ArrayList<MapstoTerm>();
+} {
+	t = <KW_MORPHISM>
+	(<KW_FROM> fromGraph = ident())?
+	(<KW_TO> toGraph = ident())?
+	<OP_BRACE_OPEN>
+	(
+		map = mapsto() { pairs.add(map); }
+		( <OP_SEMICOLON> ( map = mapsto() { pairs.add(map); } )? )*
+	)?
+	<OP_BRACE_CLOSE>
+	{ return SgfTerm.createMorphismDefTerm(t, fromGraph, toGraph, pairs); }
+}
+
+private SgfTerm morphism() : {
+	SgfTerm result;
+} {
+	( result = morphismDef() | result = ident() )
+	{ return result; }
+}
+
+private List<SgfTerm> morphismList() : { 
+	List<SgfTerm> result = new ArrayList<SgfTerm>();
+	SgfTerm morph;
+}{
+	<OP_BRACKET_OPEN>
+	(
+		morph = morphism() { result.add(morph); }
+		( <OP_COMMA> ( morph = morphism() { result.add(morph); } )? )*
+	)?
+	<OP_BRACKET_CLOSE>
+	{ return result; }
+|
+	morph = morphism()
+	{ result.add(morph); return result; }
+}
+
+private SgfTerm traceItem() : {
+	SgfTerm item;
+} {
+	( item = morphismDef() | item = graphDef() | item = ident() )
+	{ return item; }
+}
+
+private SgfTerm traceDef() : {
+	Token t;
+	List<SgfTerm> items = new ArrayList<SgfTerm>();
+	SgfTerm item;
+} {
+	t = <KW_TRACE>
+	<OP_BRACE_OPEN>
+	(
+		item = traceItem() { items.add(item); }
+		( <OP_COMMA>
+		  item = traceItem() { items.add(item); } )*
+	)?
+	<OP_BRACE_CLOSE>
+	{ return SgfTerm.createTraceDefTerm(t.beginLine, t.beginColumn, items); }
+}
+
+private SgfTerm trace() : {
+	SgfTerm trace;
+} {
+	( trace = traceDef() | trace = ident() )
+	{ return trace; }
+}
+
+private SgfTerm cospanDefBlock(Token initialToken) : {
+	Token t;
+	boolean leftSeen = false;
+	boolean rightSeen = false;
+	SgfTerm result;
+	SgfTerm left = null;
+	SgfTerm right = null;
+	SgfTerm middle = null;
+}{
+	t = <OP_BRACE_OPEN>
+	{ if (initialToken == null) initialToken = t; }
+	( LOOKAHEAD(2)
+	(
+		(
+			<KW_LEFT><OP_IS> left = morphism() (<OP_SEMICOLON>)*
+			{
+				if (leftSeen) throw new ParseException("Duplicate left morphism.");
+				leftSeen = true;
+			}
+		|
+			<KW_RIGHT><OP_IS> right = morphism() (<OP_SEMICOLON>)*
+			{
+				if (rightSeen) throw new ParseException("Duplicate right morphism.");
+				rightSeen = true;
+			}
+		)+
+		{ result = SgfTerm.createCospanDefTerm(initialToken, left, right); }
+	)|(
+		left = graph()
+		<OP_BINEDGE_RIGHT>
+		middle = graph()
+		<OP_BINEDGE_LEFT>
+		right = graph()
+		{ result = SgfTerm.createQuickCospanDefTerm(initialToken, left, middle, right); }
+	))
+	<OP_BRACE_CLOSE>
+	{ return result; }
+}
+
+private SgfTerm cospanDef() : {
+	Token t;
+	SgfTerm result;
+} {
+	t = <KW_COSPAN>
+	result = cospanDefBlock(t)
+	{ return result; }
+}
+
+private SgfTerm cospan() : {
+	SgfTerm cospan;
+} {
+	( cospan = cospanDef() | cospan = ident() )
+	{ return cospan; }
+}
+
+private SgfTerm ruleDef() : {
+	Token t;
+	boolean leftSeen = false;
+	boolean rightSeen = false;
+	boolean morphismSeen = false;
+	boolean nacsSeen = false;
+	SgfTerm result;
+	SgfTerm left = null;
+	SgfTerm right = null;
+	SgfTerm morph = null;
+	SgfTerm nac = null;
+	List<SgfTerm> nacs = null;
+} {
+	t = <KW_RULE>
+	<OP_BRACE_OPEN>
+	((
+		(
+		  <KW_LEFT><OP_IS> left = graph() (<OP_SEMICOLON>)*
+		  { if (leftSeen) throw new ParseException("Duplicate left-hand side.");
+		    leftSeen = true; }
+		| <KW_RIGHT><OP_IS> right = graph() (<OP_SEMICOLON>)*
+		  { if (rightSeen) throw new ParseException("Duplicate right-hand side.");
+		    rightSeen = true; }
+		| <KW_MORPHISM><OP_IS> morph = morphism() (<OP_SEMICOLON>)*
+		  { if (morphismSeen) throw new ParseException("Duplicate rule morphism.");
+		    morphismSeen = true; }
+		| <KW_NACS><OP_IS> nacs = morphismList() (<OP_SEMICOLON>)*
+		  { if (nacsSeen) throw new ParseException("Duplicate nacs list.");
+		    nacsSeen = true; }
+		)+
+		{ result = SgfTerm.createRuleDefTerm(t, left, right, morph, nacs); }
+	)|(
+		left = graphDefBlock(null)
+		<OP_MAPSTO>
+		right = graphDefBlock(null)
+		(
+		  <KW_NOT>
+		  nac = graphDefBlock(null)
+		  { if (nacs == null) nacs = new ArrayList<SgfTerm>();
+		    nacs.add(nac); }
+		)*
+		{ result = SgfTerm.createQuickRuleDefTerm(t, left, right, nacs); }
+	))
+	<OP_BRACE_CLOSE>
+	{ return result; }
+}
+
+private SgfTerm rule() : {
+	SgfTerm rule;
+} {
+	( rule = ruleDef() | rule = ident() )
+	{ return rule; }
+}
+
+private List<SgfTerm> ruleList() : {
+	List<SgfTerm> result = new ArrayList<SgfTerm>();
+	SgfTerm rule;
+} {
+	<OP_BRACKET_OPEN>
+	(
+		rule = rule() { result.add(rule); }
+		( <OP_COMMA> ( rule = rule() { result.add(rule); } )? )*
+	)?
+	<OP_BRACKET_CLOSE>
+	{ return result; }
+|
+	rule = rule()
+	{ result.add(rule); return result; }
+}
+
+private SgfTerm gtsDef() : {
+	Token t;
+	boolean initialSeen = false;
+	boolean rulesSeen = false;
+	SgfTerm initial = null;
+	List<SgfTerm> rules = null;
+} {
+	t = <KW_GTS>
+	<OP_BRACE_OPEN>
+	((
+		<KW_INITIAL><OP_IS>
+		{ if (initialSeen) throw new ParseException("Duplicate initial graph");
+		  initialSeen = true; }
+		initial = graph()
+		(<OP_SEMICOLON>)*
+	)|(
+		<KW_RULES><OP_IS>
+		{ if (rulesSeen) throw new ParseException("Duplicate rules section");
+		  rulesSeen = true; }
+		rules = ruleList()
+		(<OP_SEMICOLON>)*
+	))*
+	<OP_BRACE_CLOSE>
+	{ return SgfTerm.createGtsDefTerm(t, initial, rules); }
+}
+
+private SgfTerm systemDef() : {
+	Token t;
+	boolean initialSeen = false;
+	boolean rulesSeen = false;
+	SgfTerm initial = null;
+	SgfTerm trans;
+	List<SgfTerm> transitions = new ArrayList<SgfTerm>();
+} {
+	t = <KW_SYSTEM>
+	<OP_BRACE_OPEN>
+	((
+		<KW_INITIAL><OP_IS>
+		{
+			if (initialSeen) throw new ParseException("Duplicate initial graph");
+			initialSeen = true;
+		}
+		initial = graph()
+		(<OP_SEMICOLON>)*
+	)|(
+		<KW_TRANS><OP_IS>
+		<OP_BRACKET_OPEN>
+		{
+			if (rulesSeen) throw new ParseException("Duplicate transitions section");
+			rulesSeen = true;
+		}
+		trans = morphism() { transitions.add(trans); }
+		(
+			<OP_COMMA>
+			trans = morphism() { transitions.add(trans); }
+		)*
+		<OP_BRACKET_CLOSE>
+		(<OP_SEMICOLON>)*
+	))*
+	<OP_BRACE_CLOSE>
+	{ return SgfTerm.createEtsDefTerm(t, initial, transitions); }
+}
+
+/*
+ * conditions come in two variants:
+ *
+ * - regular (Pennemann-style conditions) using first-class logical operators
+ *   and single graph morphisms after quantifiers
+ * - cospan conditions, using sets of cospans after quantifiers
+ *
+ * They are defined using the same keywords, but use different syntax:
+ * exists(m, c) is a Pennemann condition, exists { m => c } is a cospan condition.
+ *
+ * This slightly complicates parsing since we do not always know what type of
+ * condition we are expecting (for instance, after "x = and [", any type can
+ * follow). There are some cases in which we do know what to expect (like
+ * after "exists(a,") but since we need to check ambiguous cases in SgfBuilder
+ * anyway, we just allow anything anywhere.
+ */
+
+/* some_cospan => some_condition */
+private CospanConditionTupleTerm cospanConditionTuple() : {
+	SgfTerm mor;
+	SgfTerm child;
+} {
+	( mor = cospan() | mor = cospanDefBlock(null) )
+	<OP_MAPSTO>
+	child = anyCondition()
+	{ return SgfTerm.createCospanConditionTupleTerm(mor.getLine(), mor.getColumn(), mor, child); }
+}
+
+private SgfTerm cospanConditionDefBlock(Token beginToken, Quantifier quantifier) : {
+	RefTerm over = null;
+	CospanConditionTupleTerm ctt;
+	List<CospanConditionTupleTerm> pairs = new ArrayList<CospanConditionTupleTerm>();
+} {
+	(<KW_OVER> over = ident())?
+	<OP_BRACE_OPEN>
+	(
+		ctt = cospanConditionTuple() { pairs.add(ctt); }
+		( <OP_COMMA> ( ctt = cospanConditionTuple() { pairs.add(ctt); } )? )*
+	)?
+	<OP_BRACE_CLOSE>
+	{
+		return SgfTerm.createCospanConditionDefTerm(beginToken, quantifier, over, pairs);
+	}
+}
+
+/* A Pennemann-style graph condition */
+private SgfTerm graphConditionDefBlock(Token beginToken, Quantifier quantifier) : {
+	SgfTerm mor, childcond;
+} {
+	<OP_PAR_OPEN>
+	mor = morphism()
+	<OP_COMMA>
+	childcond = anyCondition()
+	<OP_PAR_CLOSE>
+	{
+		return SgfTerm.createGraphConditionDefTerm(beginToken, quantifier, mor, childcond);
+	}
+}
+
+private SgfTerm anyConditionDefBlock(Token beginToken, Quantifier quantifier) : {
+	SgfTerm c;
+} {
+	(
+		c = cospanConditionDefBlock(beginToken, quantifier) |
+		c = graphConditionDefBlock(beginToken, quantifier)
+	)
+	{ return c; }
+}
+
+private SgfTerm anyCondition() : {
+	SgfTerm c;
+} {
+	( c = anyConditionTerm() | c = ident() )
+	{ return c; }
+}
+
+private List<SgfTerm> anyConditionList() : {
+	List<SgfTerm> result = new ArrayList<SgfTerm>();
+	SgfTerm cond;
+} {
+	<OP_BRACKET_OPEN>
+	(
+		cond = anyCondition() { result.add(cond); }
+		( <OP_COMMA> ( cond = anyCondition() { result.add(cond); } )? )*
+	)?
+	<OP_BRACKET_CLOSE>
+	{ return result; }
+}
+
+/* any condition term (don't know yet if graph or cospan conditions) */
+private SgfTerm anyConditionTerm() : {
+	Token t;
+	SgfTerm c;
+	List<SgfTerm> cc;
+	RefTerm over = null;
+} {
+	(
+		t = <KW_NOT>  c = anyCondition() /* was anyConditionTerm - TODO */ { return SgfTerm.createConditionNegTerm(t, c); } |
+		t = <KW_AND> cc = anyConditionList() { return SgfTerm.createConditionAndOrTerm(t, Quantifier.Forall, cc); } |
+		t = <KW_OR>  cc = anyConditionList() { return SgfTerm.createConditionAndOrTerm(t, Quantifier.Exists, cc); } |
+		t = <KW_EXISTS>  c = anyConditionDefBlock(t, Quantifier.Exists) { return c; } |
+		t = <KW_FORALL>  c = anyConditionDefBlock(t, Quantifier.Forall) { return c; } |
+		/* Note that SgfBuilder will throw up if true or false are used anywhere
+		 * except in a quantified condition. This is somehow expected since when
+		 * doing "x = true", neither the origin nor the type (pennemann/cospan)
+		 * is known and additional syntax is necessary to specify it. Other cases
+		 * would be a constant in a conjunction/disjunction, which is valid, but
+		 * somewhat exotic. FIXME since this is a bug in SgfBuilder, though. */
+		t = <KW_TRUE>  (<KW_OVER> over = ident())? { return SgfTerm.createConstantConditionTerm(t, over, true); } |
+		t = <KW_FALSE> (<KW_OVER> over = ident())? { return SgfTerm.createConstantConditionTerm(t, over, false); }
+	)
+}
+
+private SgfTerm copy() : {
+	Token t;
+	RefTerm name;
+} {
+	t = <KW_COPY>
+	<OP_PAR_OPEN>
+	name = ident()
+	<OP_PAR_CLOSE>
+	{ return SgfTerm.createCopyTerm(t, name.getName()); }
+}
+
+private SgfTerm definition() : {
+	RefTerm name = null;
+	SgfTerm value;
+} {
+	( LOOKAHEAD(2) name = ident() <OP_IS> )?
+	( value = graphDef()
+	| value = ifGraphDef()
+	| value = cospanDef()
+	| value = ruleDef()
+	| value = morphismDef()
+	| value = traceDef()
+	| value = gtsDef()
+	| value = systemDef()
+	| value = anyConditionTerm()
+	| value = copy()
+	)
+	(<OP_SEMICOLON>)*
+	{
+		if (name == null)
+			return value;
+		else
+			return SgfTerm.createLetTerm(name.getLine(), name.getColumn(), name.getName(), value);
+	}
+}
+
+private SgfTerm graphFile() : {
+	SgfTerm result;
+} {
+	(<OP_SEMICOLON>)*
+	result = graphDef()
+	(<OP_SEMICOLON>)*
+	<EOF>
+	{ return result; }
+}
+
+private List<SgfTerm> sgfFile() : {
+	SgfTerm current;
+	List<SgfTerm> result = new ArrayList<SgfTerm>();
+} {
+	( current = definition() { result.add(current); } )*
+	<EOF>
+	{ return result; }
+}
