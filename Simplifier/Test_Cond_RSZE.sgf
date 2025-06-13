@@ -1,0 +1,16 @@
+3nodes = graph { node n1; node n2; node n3; };
+2nodes = graph { node n1; node n2; };
+Aloops = graph { n1 --A-> n1; node n2; node n3; };
+ABloops = graph { n1 --A-> n1; n2 --B-> n2; };
+empty = graph { };
+ABline = graph { n1 --A-> n2; n2 --B-> n3; };
+Aline = graph { n1 --A-> n2; };
+
+Con2_1 = exists { { 3nodes -> { n1 --A-> n2; n2 --B-> n3; } <- 3nodes } => true }
+Con2_2 = exists { { 3nodes -> Aloops <- 3nodes } => true };
+Con1 = exists { { 2nodes -> ABloops <- 2nodes } => true };
+Con2 = or [ Con2_1, Con2_2 ];
+Conl = exists { { 2nodes -> { n2 --B-> n3; node n1; } <- 3nodes } => true };
+ConVor1 = forall { { empty -> ABline <- 3nodes } => Con2 };
+ConVor2 = forall { { empty -> Aline <- 2nodes } => Con1 };
+Con= and [ ConVor1, ConVor2 ];
