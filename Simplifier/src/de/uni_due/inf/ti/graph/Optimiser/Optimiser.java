@@ -17,13 +17,13 @@ import de.uni_due.inf.ti.graph.ext.Square;
 
 /**
  * This Optimiser works on injective Cospan Conditions
- **/
+ */
 public class Optimiser {
 	
 	public static boolean Identity = true;
 	public static boolean POCOL = true;
 	public static boolean POCB = true;
-	public static boolean RSZE = true;
+	public static boolean RSTL = true;
 	
 	public static CospanCondition optimise(CospanCondition c) {
 		c = makeAlternating(c);
@@ -42,13 +42,18 @@ public class Optimiser {
 		List<CospanCondition> new_C = new LinkedList<>();
 		List<ChildTuple> new_CT = new LinkedList<>();
 		for(int i = 0; i < ct_list.size();i++) {
+			//raus nehmen falls es Probleme macht
+			if(ct_list.get(i).getChildCondition().getChildren().size() == 0) {
+				new_CT.add(new ChildTuple(ct_list.get(i).getMorphism(), going_Through_Condition(ct_list.get(i).getChildCondition())));
+				return new_CT;
+			}
 			for(int j=0; j < ct_list.size();j++) {
 				if(removed.contains(i) || i==j) continue;
 				ChildTuple ct_c1 = ct_list.get(i);
 				ChildTuple ct_c2 = ct_list.get(j);			
 				Cospan l = check_subgraph(ct_c1.getMorphism(), ct_c2.getMorphism());
 				if (l == null) continue;
-				if(RSZE && RSZE(ct_c1.getChildCondition(),ct_c2.getChildCondition(),l)) {					
+				if(RSTL && RSTL(ct_c1.getChildCondition(),ct_c2.getChildCondition(),l)) {					
 					removed.add(i);					
 				}
 				if(POCOL && POCOL(ct_c1.getChildCondition(), ct_c2.getChildCondition())) {					
@@ -105,9 +110,10 @@ public class Optimiser {
 	}		
 
 	/**
+	 * Pushout Complement One Layer
 	 * 
-	 * @param c1, is the ChildCondition of the ChildTuple(m1,c1) where m1;m3 = m2
-	 * @param c2, is the ChildCondition of the ChildTuple(m2,c2) where m1;m3 = m2
+	 * @param c1 is the ChildCondition of the ChildTuple(m1,c1) where m1;m3 = m2
+	 * @param c2 is the ChildCondition of the ChildTuple(m2,c2) where m1;m3 = m2
 	 * @return returns true if the optimization can be applied otherwise false
 	 */
 	private static boolean POCOL(CospanCondition c1, CospanCondition c2) {
@@ -117,9 +123,10 @@ public class Optimiser {
 	}
 	
 	/**
+	 * Pushout Complement Bijektiv
 	 * 
-	 * @param c1, is the ChildCondition of the ChildTuple(m1,c1) where m1;m3 = m2 
-	 * @param c2, is the ChildCondition of the ChildTuple(m2,c2) where m2;m3 = m1
+	 * @param c1 is the ChildCondition of the ChildTuple(m1,c1) where m1;m3 = m2 
+	 * @param c2 is the ChildCondition of the ChildTuple(m2,c2) where m2;m3 = m1
 	 * @return returns Condition c1 with all childs of c2 additional added
 	 */
 	private static CospanCondition POCB(CospanCondition c1, CospanCondition c2) {
@@ -130,13 +137,14 @@ public class Optimiser {
 	}
 	
 	/**
+	 * Repräsentaive Squares Two Levels
 	 * 
-	 * @param c1, is the ChildCondition of the ChildTuple(m1,c1) where m1;m3 = m2
-	 * @param c2, is the ChildCondition of the ChildTuple(m2,c2) where m1;m3 = m2 
-	 * @param l, is the Cospan m3 from m1;m3 = m2
+	 * @param c1 is the ChildCondition of the ChildTuple(m1,c1) where m1;m3 = m2
+	 * @param c2 is the ChildCondition of the ChildTuple(m2,c2) where m1;m3 = m2 
+	 * @param l is the Cospan m3 from m1;m3 = m2
 	 * @return returns true if the optimization can be applied otherwise false
 	 */
-	private static boolean RSZE(CospanCondition c1, CospanCondition c2, Cospan l) {
+	private static boolean RSTL(CospanCondition c1, CospanCondition c2, Cospan l) {
 		List<ChildTuple> ct_c1 = process_ChildTuple_RSZE(c1);
 		List<ChildTuple> ct_c2 = process_ChildTuple_RSZE(c2);
 		if(ct_c1 == null || ct_c2 == null) return false;		

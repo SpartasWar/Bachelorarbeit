@@ -1,0 +1,255 @@
+
+/*
+ * The  Car platoon maneuver protocol case study in Pennemann's thesis
+ *
+ * We use the node labes exactly as described. We will simulate these labes with unary Loops on the node.
+ * fa : free Agent
+ * ldr : leader
+ * flw : follower
+ * fl : front leader
+ * rl : rear leader
+ * spl : spliting leader
+ * acc : accelerating leader
+ * We dont use spezial Edge Labels,
+ * Edges represents the order of the cars
+ */
+ 
+ ldrNeverHasLdr = forall { { [] { n1 --A-> n2; ldr(n1); } [n1,n2] } => not exists { { [n1,n2] { n1 --A-> n2; ldr(n1); ldr(n2); } [n1,n2] } => true } };
+ 
+  ldrHasNeighbor_1 = exists { { [n1] { n1 --A-> n2; ldr(n1); } [n1,n2] } => true };
+  ldrHasNeighbor_2 = exists { [n1] { n1 --A-> n2; ldr(n1); } [n1,n2] } => true };
+ ldrHasNeighbor = forall { { [] { ldr(n1); } [n1] } => or [ ldrHasNeighbor_1, ldrHasNeighbor_1 ] };
+ 
+ uniqueLdr_1 = exists { { [n1] { n2 --A-> n1; ldr(n2); } [n1,n2] } => true };
+ uniqueLdr_2 = exists { { [n1] { n2 --A-> n1; n3 --A-> n1; ldr(n2); ldr(n3); } [n1,n2,n3] } => true };
+ uniqueLdr_3 = and [ uniqueLdr_1, uniqueLdr_2 ];
+ uniqueLdr_4 = or [ exists { { [n1] { ldr(n1); } [n1] } => true },
+ 					exists { { [n1] { fa(n1); } [n1] } => true },
+ 					uniqueLdr_3
+ 					];
+uniqueLdr = forall { { [] { node n1;} [n1] } => uniqueLdr_4 };	
+
+ ldrHasFlw_1 = exists { { [n1] { n1 --A-> n2; ldr(n1); flw(n2); } [n1,n2] } => true };
+ ldrHasFlw_2 = exists { { [n1] { n1 --A-> n2; ldr(n1); spl(n2); } [n1,n2] } => true };
+ldrHasFlw = forall { { [] { ldr(n1); } [n1] } => or [ ldrHasFlw_1, ldrHasFlw_1 ] };
+
+ flwHasLdr_1 = exists { { [n1] { n2 --A-> n1; ldr(n2); flw(n1); } [n1,n2] } => true }; 
+ flwHasLdr_2 = not exists { { [n1] { n2 --A-> n1; n3 --A-> n1; ldr(n3); ldr(n2); flw(n1); } [n1,n2] } => true };
+flwHasLdr = forall { { [] { flw(n1); } [n1] } => and [ flwHasLdr_1, flwHasLdr_1 ] };
+
+
+ flwHasSomeLdr_1 = exists { { [n1] { n2 --A-> n1; ldr(n2); flw(n1); } [n1,n2] } => true };
+ flwHasSomeLdr_2 = exists { { [n1] { n2 --A-> n1; rl(n2); flw(n1); } [n1,n2] } => true };
+ flwHasSomeLdr_3 = exists { { [n1] { n2 --A-> n1; acc(n2); flw(n1); } [n1,n2] } => true };
+ flwHasSomeLdr_4 = exists { { [n1] { n2 --A-> n1; fl(n2); flw(n1); } [n1,n2] } => true };
+ flwHasSomeLdr_5 = exists { { [n1] { n2 --A-> n1; spl(n2); flw(n1); } [n1,n2] } => true };
+flwHasSomeLdr = forall { { [] { flw(n1); } [n1] } => or [ flwHasSomeLdr_1, flwHasSomeLdr_2, flwHasSomeLdr_3, flwHasSomeLdr_4, flwHasSomeLdr_5 ] };
+
+
+freeAgents = not exists {
+		{ [] { n1 --A-> n2; fa(n1); } [n1,n2] } => true,
+		{ [] { n2 --A-> n1; fa(n1); } [n1,n2] } => true	
+};
+
+
+Create = rsrule { 
+		{ } 
+	=>	{ fa(n1); }
+	if true	};
+	
+Destroy = rsrule { 
+		{ fa(n1); } 
+	=>	{ }
+	if true	};
+
+InitMerge1 = rsrule { 
+		{ ldr(n1); ldr(n2) } 
+	=>	{ rl(n1); fl(n2); }
+	if true	};
+	
+InitMerge2 = rsrule { 
+		{ ldr(n1); fa(n2) } 
+	=>	{ rl(n1); fl(n2); }
+	if true	};
+	
+InitMerge3 = rsrule { 
+		{ fa(n1); ldr(n2) } 
+	=>	{ rl(n1); fl(n2); }
+	if true	};
+	
+InitMerge4 = rsrule { 
+		{ fa(n1); fa(n2) } 
+	=>	{ rl(n1); fl(n2); }
+	if true	};
+	
+Pass1 = rsrule { 
+		{ rl(n1); fl(n2); flw(n3); n1 --A-> n2; n1 --A-> n3; } 
+	=>	{ rl(n1); fl(n2); flw(n3); n1 --a1:A-> n2 --a2:A-> n3; }
+	if true	};
+	
+Ldr2Flw = rsrule { 
+		{ rl(n1); fl(n2) } 
+	=>	{ flw(n1); ldr(n2); }
+	if not exists { 
+		{ [n1,n2] { rl(n1); fl(n2); n1 --A-> n2; n1 --A-> n1; } [n1,n2] } => true,
+		{ [n1,n2] { rl(n1); fl(n2); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+		{ [n1,n2] { rl(n1); fl(n2); n1 --A-> n2; n2 --A-> n1; } [n1,n2] } => true,
+		{ [n1,n2] { rl(n1); fl(n2); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+		{ [n1,n2] { rl(n1); fl(n2); n1 --a1:A-> n2; n1 --a:2A-> n2; } [n1,n2] } => true,
+		{ [n1,n2] { rl(n1); fl(n2); fl(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true
+	}
+};
+
+InitSplit1 = rsrule { 
+		{ flw(n1); } 
+	=>	{ spl(n1); }
+	if true	};
+	
+Pass2 = rsrule { 
+		{ flw(n1); ldr(n2); spl(n3); n2 --A-> n1; n2 --A-> n3; } 
+	=>	{ flw(n1); ldr(n2); spl(n3); n3 --A-> n1; n2 --A-> n3; }
+	if true	};
+
+
+
+ SplitMiddle_1 = not exists {
+	{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n1 --A-> n1; } [n1,n2] } => true,	
+	{ [n1,n2] { ldr(n1); spl(n2); spl(n4); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fa(n4); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); acc(n4); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fl(n4); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); rl(n4); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); ldr(n4); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,	
+	{ [n1,n2] { ldr(n1); spl(n2); spl(n4); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fa(n4); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); acc(n4); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fl(n4); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); rl(n4); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); ldr(n4); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n2 --A-> n2; } [n1,n2] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); n1 --a1:A-> n2; n1 --a2:A-> n2; } [n1,n2] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n2 --A-> n1; } [n1,n2] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); spl(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fa(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); acc(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fl(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); rl(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); ldr(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,	
+	{ [n1,n2] { ldr(n1); spl(n2); spl(n4); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fa(n4); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); acc(n4); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); fl(n4); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); rl(n4); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+	{ [n1,n2] { ldr(n1); spl(n2); ldr(n4); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true
+};
+ SplitMiddle_2 = and [ exists { { [n1,n2] {ldr(n1); spl(n2); flw(n4); n1 --A-> n4; n1 --A-> n2; } [n1,n2,n4] } => true },
+ 					   exists { { [n1,n2] {ldr(n1); spl(n2); flw(n4); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true }, 
+ 					   SplitMiddle_1
+ 					   ];	
+SplitMiddle = rsrule { 
+		{ ldr(n1); spl(n2); n1 --A-> n2; } 
+	=>	{ ldr(n1); ldr(n2); }
+	if SplitMiddle_2 };
+	
+
+SplitLast = rsrule { 
+		{ ldr(n1); spl(n2); n1 --A-> n2; } 
+	=>	{ ldr(n1); fa(n2); }
+	if not exists { 
+		{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n2 --A-> n2; } [n1,n2] } => true,
+		{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+		{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+		{ [n1,n2] { ldr(n1); spl(n2); n1 --A-> n2; n2 --A-> n1; } [n1,n2] } => true,
+		{ [n1,n2] { ldr(n1); spl(n2); n1 --a1:A-> n2; n1 --a2:A-> n2; } [n1,n2] } => true
+	} 
+};
+
+InitSplit2 = rsrule { 
+		{ ldr(n1); } 
+	=>	{ acc(n1); }
+	if true };
+	
+TwoSplit = rsrule { 
+		{ acc(n1); flw(n2); n1 --A-> n2; } 
+	=>	{ fa(n1); fa(n2); }
+	if not exists { 
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n1 --A-> n1; } [n1,n2] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n1 --A-> n4; } [n1,n2,n4] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n4 --A-> n1; } [n1,n2,n4] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n2 --A-> n4; } [n1,n2,n4] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n4 --A-> n2; } [n1,n2,n4] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --a1:A-> n2; n1 --a2:A-> n2; } [n1,n2] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n2 --A-> n2; } [n1,n2] } => true,
+		{ [n1,n2] { acc(n1); flw(n2); n1 --A-> n2; n2 --A-> n1; } [n1,n2] } => true	
+	} 
+};
+
+
+Pass3 = rsrule { 
+		{ flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; } 
+	=>	{ flw(n1); acc(n2); flw(n3); n2 --A-> n3; n3 --A-> n1; }
+	if not exists { 
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; n1 --A-> n1; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; n1 --A-> n2; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; n1 --A-> n3; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --a1:A-> n1; n2 --a2:A-> n1; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --a1:A-> n3; n2 --A-> n1; n2 --a2:A-> n3; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; n3 --A-> n3; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; n3 --A-> n1; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); n2 --A-> n3; n2 --A-> n1; n3 --A-> n2; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fl(n6); n2 --A-> n3; n2 --A-> n1; n1 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); rl(n6); n2 --A-> n3; n2 --A-> n1; n1 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); ldr(n6); n2 --A-> n3; n2 --A-> n1; n1 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); spl(n6); n2 --A-> n3; n2 --A-> n1; n1 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fa(n6); n2 --A-> n3; n2 --A-> n1; n1 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); acc(n6); n2 --A-> n3; n2 --A-> n1; n1 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n1; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); rl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n1; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); ldr(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n1; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); spl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n1; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fa(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n1; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); acc(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n1; } [n1,n2,n3,n6] } => true,		
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fl(n6); n2 --A-> n3; n2 --A-> n1; n2 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); rl(n6); n2 --A-> n3; n2 --A-> n1; n2 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); ldr(n6); n2 --A-> n3; n2 --A-> n1; n2 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); spl(n6); n2 --A-> n3; n2 --A-> n1; n2 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fa(n6); n2 --A-> n3; n2 --A-> n1; n2 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); acc(n6); n2 --A-> n3; n2 --A-> n1; n2 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n2; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); rl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n2; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); ldr(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n2; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); spl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n2; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fa(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n2; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); acc(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n2; } [n1,n2,n3,n6] } => true,		
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fl(n6); n2 --A-> n3; n2 --A-> n1; n3 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); rl(n6); n2 --A-> n3; n2 --A-> n1; n3 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); ldr(n6); n2 --A-> n3; n2 --A-> n1; n3 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); spl(n6); n2 --A-> n3; n2 --A-> n1; n3 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fa(n6); n2 --A-> n3; n2 --A-> n1; n3 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); acc(n6); n2 --A-> n3; n2 --A-> n1; n3 --A-> n6; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n3; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); rl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n3; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); ldr(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n3; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); spl(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n3; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); fa(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n3; } [n1,n2,n3,n6] } => true,
+		{ [n1,n2,n3] { flw(n1); acc(n2); flw(n3); acc(n6); n2 --A-> n3; n2 --A-> n1; n6 --A-> n3; } [n1,n2,n3,n6] } => true
+	} 
+};
+
+
+Pass4 = rsrule { 
+		{ flw(n1); acc(n2); ldr(n3); n2 --A-> n3; n2 --A-> n1; } 
+	=>	{ flw(n1); acc(n2); ldr(n3); n2 --A-> n3; n3 --A-> n1; }
+	if true };
+
+AccLeader = rsrule { 
+		{ acc(n1); ldr(n2); n1 --A-> n2; } 
+	=>	{ acc(n1); ldr(n2);}
+	if not exists {
+		{ [n1,n2] { acc(n1); ldr(n2); n1 --A-> n2; n1 --A-> n1} [n1,n2] } => true,
+		{ [n1,n2] { acc(n1); ldr(n2); n1 --A-> n2; n1 --A-> n4} [n2,n2,n4] } => true,
+		{ [n1,n2] { acc(n1); ldr(n2); n1 --A-> n2; n4 --A-> n1} [n2,n2,n4] } => true,
+		{ [n1,n2] { acc(n1); ldr(n2); n1 --a1:A-> n2; n1 --a2:A-> n2} [n1,n2] } => true,
+		{ [n1,n2] { acc(n1); ldr(n2); n1 --A-> n2; n2 --A-> n1} [n1,n2] } => true	
+	}
+};

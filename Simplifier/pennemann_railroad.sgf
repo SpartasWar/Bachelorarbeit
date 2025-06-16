@@ -1,0 +1,84 @@
+/*
+ * The railroad case study in Pennemann's thesis
+ *
+ * Node labels are not used in this example (all nodes are waypoints).
+ * Edge labels are used exactly as in the example: track, train, switchhead, switchend.
+ * track is an undirected edge, and represented as a pair of directed edges (as described in the thesis).
+ * switchhead is a loop, represented as a single edge (directed).
+ * switchend is undirected, hence represented as a pair.
+ */
+empty = graph { };
+
+onTrack = forall { { [] { n1 --train-> n2; } [n1,n2] } => exists { { [n1,n2] { n1 <-track-> n2 } [n1,n2] } => true } };
+noTwo = not exists {
+	{ [] { n1 --train-> n2; n1 --train-> n2; } [n1,n2] } => true,
+	{ [] { n1 --train-> n2; n2 --train-> n1; } [n1,n2] } => true
+};
+altNoTwo = not exists {
+	{ [] { n1 --train-> n2; n1 --train-> n2; n1 <-track-> n2; } [n1,n2] } => true,
+	{ [] { n1 --train-> n2; n2 --train-> n1; n1 <-track-> n2; } [n1,n2] } => true
+};
+direction = not exists {
+	{ [] { n1 --train-> n2 --train-> n3; } [n1,n2,n3] } => true,
+	{ [] { n1 --train-> n2 <-train-- n3; } [n1,n2,n3] } => true
+};
+decidable = and [ noTwo, direction ];
+consistent = and [ onTrack, decidable ];
+
+/* Extension of the net */
+Build1 = rsrule { { node n1; } => { n1 <-track-> n2; } if true };
+
+/* Connection of two waypoints */
+Build2 = rsrule { { node n1; node n2; } => { n1 <-track-> n2; } if true };
+
+/* Build of a switch */
+Build3 = rsrule { { node n1; } => { n1 --switchhead-> n1 <-track-> n2 <-switchend-> n3; } if true };
+
+/* Addition of a train to the railroad net */
+Add = rsrule { { n1 <-t:track-> n2 } => { n1 <-t:track-> n2; n1 --train-> n2; } if true };
+
+AddAC = rsrule {
+	   { n1 <-t:track-> n2 }
+	=> { n1 <-t:track-> n2; n1 --train-> n2; }
+	if not exists {
+		{ [n1,n2] { n1 <-t:track-> n2; n1 --train-> n2 } [n1,n2] } => true,
+		{ [n1,n2] { n1 <-t:track-> n2; n2 --train-> n1 } [n1,n2] } => true,
+		{ [n1,n2] { n1 <-t:track-> n2; n2 --train-> n5 } [n1,n2,n5] } => true,
+		{ [n1,n2] { n1 <-t:track-> n2; n5 --train-> n2 } [n1,n2,n5] } => true,
+		{ [n1,n2] { n1 <-t:track-> n2; n5 --train-> n1 } [n1,n2,n5] } => true
+	}
+ };
+
+/* Movement of a train along the railroad net */
+Move = rsrule {
+	   { n1 <-t1:track-> n2 <-t2:track-> n3; n1 --train-> n2; }
+	=> { n1 <-t1:track-> n2 <-t2:track-> n3; n2 --train-> n3; }
+	if true };
+	
+MoveAC = rsrule {
+		{ n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; }
+	 => { n1 <-t1:track-> n2 <-t2:track-> n3; n2 --l1:train-> n3; }
+	 if not exists {
+	 	{ [n1,n2,n3] {n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; n2 --l2:train-> n3 } [n1,n2,n3] } => true,
+	 	{ [n1,n2,n3] {n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; n3 --l2:train-> n2 } [n1,n2,n3] } => true,
+	 	{ [n1,n2,n3] {n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; n1 --l2:train-> n3 } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] {n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; n3 --l2:train-> n1 } [n1,n2,n3] } => true,
+	 	{ [n1,n2,n3] {n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; n3 --l2:train-> n9 } [n1,n2,n3,n9] } => true,
+	 	{ [n1,n2,n3] {n1 <-t1:track-> n2 <-t2:track-> n3; n1 --l1:train-> n2; n9 --l2:train-> n3 } [n1,n2,n3,n9] } => true	 
+	 }	 
+};
+
+/* Switch of points */
+Switch = rsrule {
+	   { n1 --switchhead-> n1; n1 <-track-> n2; n2 <-switchend-> n3; }
+	=> { n1 --switchhead-> n1; n1 <-track-> n3; n2 <-switchend-> n3; }
+	if true };
+
+SwitchAC = rsrule {
+	   { n1 --switchhead-> n1; n1 <-track-> n2; n2 <-switchend-> n3; }
+	=> { n1 --switchhead-> n1; n1 <-track-> n3; n2 <-switchend-> n3; }
+	if not exists {
+		{ [n1,n2,n3] { n1 --t:train-> n2; node n3; } [n1,n2,n3] } => true,
+		{ [n1,n2,n3] { n1 <-t:train-- n2; node n3; } [n1,n2,n3] } => true
+	}
+};
