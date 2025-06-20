@@ -20,33 +20,50 @@ import de.uni_due.inf.ti.graph.ext.Square;
  */
 public class Optimiser {
 	
-	public static boolean Identity = true;
+	private static boolean changed = false;
+	
 	public static boolean POCOL = true;
 	public static boolean POCB = true;
 	public static boolean RSTL = true;
+	public static boolean compose_over_id = true;
 	
 	public static CospanCondition optimise(CospanCondition c) {
-		c = makeAlternating(c);
-		c = removeIdentities(c);
-		c = going_Through_Condition(c);
+		//System.out.print("Before: \n" + c + "\n");
+		changed = true;
+		while(changed) {
+			changed = false;
+			c = makeAlternating(c);
+			c = remove_Identities_and_Iso(c);
+			c = going_Through_Condition(c);
+		}
+		//System.out.print("After: \n" + c + "\n");
 		return c;
 	}
 	
 	
-	private static ChildTuple optimise_single_child(ChildTuple ct, Quantifier q) {
-		return new ChildTuple(ct.getMorphism(), going_Through_Condition(ct.getChildCondition()));
+	private static List<ChildTuple> optimise_single_child(List<ChildTuple> ct) {
+		List<ChildTuple> new_ct = new LinkedList<>();
+		if(compose_over_id) {
+			ct = compose_over_id(ct.get(0));
+		}
+		for(ChildTuple ct1: ct) {
+			new_ct.add(new ChildTuple(ct1.getMorphism(), going_Through_Condition(ct1.getChildCondition())));
+		}
+		
+		return new_ct;
 	}
 	
 	private static List<ChildTuple> optimise_multi_child(List<ChildTuple> ct_list){
 		List<Integer> removed = new LinkedList<>();
-		List<CospanCondition> new_C = new LinkedList<>();
 		List<ChildTuple> new_CT = new LinkedList<>();
-		for(int i = 0; i < ct_list.size();i++) {
-			//raus nehmen falls es Probleme macht
-			if(ct_list.get(i).getChildCondition().getChildren().size() == 0) {
-				new_CT.add(new ChildTuple(ct_list.get(i).getMorphism(), going_Through_Condition(ct_list.get(i).getChildCondition())));
-				return new_CT;
+		List<ChildTuple> processed_ct_List = new LinkedList<>();
+		if(compose_over_id) {
+			for(ChildTuple ct : ct_list) {
+				processed_ct_List.addAll(compose_over_id(ct));
 			}
+			ct_list = processed_ct_List;
+		}
+		for(int i = 0; i < ct_list.size();i++) {
 			for(int j=0; j < ct_list.size();j++) {
 				if(removed.contains(i) || i==j) continue;
 				ChildTuple ct_c1 = ct_list.get(i);
@@ -67,7 +84,7 @@ public class Optimiser {
 				if(POCB) {
 					if(!removed.contains(j) && check_subgraph(ct_c2.getMorphism(), ct_c1.getMorphism()) != null) {
 						CospanCondition POCB_OP = POCB(ct_c1.getChildCondition(),ct_c2.getChildCondition());
-						new_C.add(POCB_OP);
+						new_CT.add(new ChildTuple(ct_c1.getMorphism(), going_Through_Condition(POCB_OP)));
 						removed.add(i);
 						removed.add(j);
 					}
@@ -75,6 +92,7 @@ public class Optimiser {
 				}
 			}
 		}
+		if(removed.size() != 0) changed = true;
 		for(int i=0; i < ct_list.size();i++) {
 			if(removed.contains(i)) continue;
 			new_CT.add(new ChildTuple(ct_list.get(i).getMorphism(), going_Through_Condition(ct_list.get(i).getChildCondition())));
@@ -90,7 +108,7 @@ public class Optimiser {
 	private static CospanCondition going_Through_Condition(CospanCondition condition) {
 		List<ChildTuple> childtuples = condition.getChildren();
 		if(childtuples.size() == 0) return condition;
-		if(childtuples.size() == 1) return new CospanCondition(condition.getOrigin(),condition.getQuantifier(),optimise_single_child(childtuples.getFirst(),condition.getQuantifier()));
+		if(childtuples.size() == 1) return new CospanCondition(condition.getOrigin(),condition.getQuantifier(),optimise_single_child(childtuples));
 		if(childtuples.size() > 1) return new CospanCondition(condition.getOrigin(),condition.getQuantifier(),optimise_multi_child(childtuples));
 		return condition;
 	}
@@ -105,7 +123,7 @@ public class Optimiser {
 		Square s1 = PushoutComplement.compute(c1.getRightMorphism(), m1);
 		if(s1 == null) return null;
 		Morphism m2 = Morphism.getMatch(c2.getRightGraph(), s1.getRightGraph(), true);
-		if (m2 == null) return null;
+		if (m2 == null || !s1.getTopRight().isInjective() || !s1.getBottomRight().isInjective() ) return null;
 		return new Cospan(s1.getTopRight(), m2);
 	}		
 
@@ -131,8 +149,9 @@ public class Optimiser {
 	 */
 	private static CospanCondition POCB(CospanCondition c1, CospanCondition c2) {
 		List<ChildTuple> new_ct = new LinkedList<>();
-		for(ChildTuple ct: c1.getChildren()) new_ct.add(ct);
-		for(ChildTuple ct: c2.getChildren()) new_ct.add(ct);		
+		if(c1.getChildren().size() == 0 || c2.getChildren().size() == 0) return new CospanCondition(c1.getOrigin(),c1.getQuantifier(),new_ct);
+		for(ChildTuple ct: c1.getChildren()) new_ct.add(new ChildTuple(new Cospan(Morphism.getMatch(c1.getOrigin(), ct.getMorphism().getMiddleGraph(), true), ct.getMorphism().getRightMorphism()), ct.getChildCondition()));
+		for(ChildTuple ct: c2.getChildren()) new_ct.add(new ChildTuple(new Cospan(Morphism.getMatch(c1.getOrigin(), ct.getMorphism().getMiddleGraph(), true), ct.getMorphism().getRightMorphism()), ct.getChildCondition()));
 		return new CospanCondition(c1.getOrigin(),c1.getQuantifier(),new_ct);
 	}
 	
@@ -184,6 +203,27 @@ public class Optimiser {
 	}
 	
 	
+	private static List<ChildTuple> compose_over_id(ChildTuple ct){
+		List<ChildTuple> new_ct = new LinkedList<>();
+		new_ct.add(ct);
+		CospanCondition c1_ct = ct.getChildCondition();
+		if(c1_ct.getChildren().size() != 1) return new_ct;
+		Cospan identity = createIdentity(c1_ct.getOrigin());
+		ChildTuple ct_c1 = c1_ct.getChildren().get(0);
+		if(!ct_c1.getMorphism().equals(identity)) return new_ct;
+		List<ChildTuple> lct_c2 = ct_c1.getChildCondition().getChildren();
+		if(lct_c2.size() == 0) {
+			changed = true;
+			return new LinkedList<>();
+		}
+		new_ct.remove(0);
+		for(ChildTuple ct_c2 : lct_c2) {
+			new_ct.add(new ChildTuple(Cospan.concatenate(ct.getMorphism(), ct_c2.getMorphism()), ct_c2.getChildCondition()));
+		}
+		changed = true;
+		return new_ct;
+	}
+	
 	/**
 	 * Determines the max depth of a condition
 	 * @param c1
@@ -218,8 +258,8 @@ public class Optimiser {
 	 * Removes all identities of the form ∀id.∃id.∀M ≡ ∀M , ∀id.∀M ≡ ∀M. Same for flipped Quantifier 
 	 * @param c
 	 * @return
-	 */
-	private static CospanCondition removeIdentities(CospanCondition c) {
+	 */	
+	private static CospanCondition remove_Identities_and_Iso(CospanCondition c) {
 		// 0 Kinder fertig
 		List<ChildTuple> childtuples = c.getChildren();
 		if(childtuples.size() == 0) return c;
@@ -228,11 +268,23 @@ public class Optimiser {
 			Cospan identity = createIdentity(c.getOrigin());
 			ChildTuple ct = childtuples.get(0);
 			CospanCondition c_c = ct.getChildCondition();
-			if(!ct.getMorphism().equals(identity)) return new CospanCondition(c.getOrigin(),c.getQuantifier(),new ChildTuple(ct.getMorphism(), removeIdentities(c_c)));
-			if(c.getQuantifier() == c_c.getQuantifier()) return removeIdentities(c_c);
-			if(c_c.getChildren().size() != 1) return new CospanCondition(c.getOrigin(),c.getQuantifier(),new ChildTuple(ct.getMorphism(), removeIdentities(c_c)));
-			if(c_c.getChildren().get(0).getMorphism().equals(identity)) return removeIdentities(c_c.getChildren().get(0).getChildCondition());
-			return new CospanCondition(c.getOrigin(),c.getQuantifier(),new ChildTuple(ct.getMorphism(), removeIdentities(c_c)));
+			if(ct.getMorphism().equals(identity)) {
+			if(c.getQuantifier() == c_c.getQuantifier()) return remove_Identities_and_Iso(c_c);
+			if(c_c.getChildren().size() != 1) return new CospanCondition(c.getOrigin(),c.getQuantifier(),new ChildTuple(ct.getMorphism(), remove_Identities_and_Iso(c_c)));
+			if(c_c.getChildren().get(0).getMorphism().equals(identity)) return remove_Identities_and_Iso(c_c.getChildren().get(0).getChildCondition());
+			}
+			if(ct.getMorphism().isIsomorphism() && c_c.getChildren().size() == 1 && c_c.getChildren().get(0).getMorphism().equals(identity)) {
+				System.out.print("Iso");
+				ChildTuple ct_c_c = c_c.getChildren().get(0);
+				Graph left = c_c.getChildren().get(0).getMorphism().getLeftGraph();
+				Morphism LtoO = Morphism.getIsomorphism(left,ct.getMorphism().getLeftGraph());
+				System.out.print("Iso");
+				if (LtoO == null) return new CospanCondition(c.getOrigin(),c.getQuantifier(),new ChildTuple(ct.getMorphism(), remove_Identities_and_Iso(c_c)));
+				System.out.print("Iso");
+				Cospan new_co = new Cospan(LtoO.getInverse().compose(ct_c_c.getMorphism().getLeftMorphism()),ct_c_c.getMorphism().getRightMorphism());
+				return new CospanCondition(ct.getMorphism().getLeftGraph(),c.getQuantifier(),new ChildTuple(new_co,remove_Identities_and_Iso(ct_c_c.getChildCondition())));
+			}
+			return new CospanCondition(c.getOrigin(),c.getQuantifier(),new ChildTuple(ct.getMorphism(), remove_Identities_and_Iso(c_c)));
 		}
 		// >1 Kinder überprüfe für jedes Kind ob ID notwendig ist
 		if(childtuples.size() > 1) {
@@ -242,22 +294,41 @@ public class Optimiser {
 				CospanCondition c_c = ct.getChildCondition();
 				if(ct.getMorphism().equals(identity)) {
 					if(c.getQuantifier() == c_c.getQuantifier()) {
-						c_c = removeIdentities(c_c);
+						c_c = remove_Identities_and_Iso(c_c);
 						new_ct.addAll(c_c.getChildren());
 					}
 					else if(c_c.getChildren().size() == 1 && c_c.getChildren().get(0).getMorphism().equals(identity)) {
-						c_c = removeIdentities(c_c.getChildren().get(0).getChildCondition());
+						c_c = remove_Identities_and_Iso(c_c.getChildren().get(0).getChildCondition());
 						new_ct.addAll(c_c.getChildren());
+					}		
+					else {
+						new_ct.add(new ChildTuple(ct.getMorphism(), remove_Identities_and_Iso(c_c)));
+					}
+				}
+				else if(ct.getMorphism().isIsomorphism() &&c_c.getChildren().size() == 1 && c_c.getChildren().get(0).getMorphism().equals(identity)) {
+					System.out.print("Iso");
+					ChildTuple ct_c_c = c_c.getChildren().get(0);
+					Graph left = c_c.getChildren().get(0).getMorphism().getLeftGraph();
+					Morphism LtoO = Morphism.getIsomorphism(left,ct.getMorphism().getLeftGraph());
+					System.out.print("Iso");
+					if (LtoO != null) {
+						System.out.print("Iso");
+						Cospan new_co = new Cospan(LtoO.getInverse().compose(ct_c_c.getMorphism().getLeftMorphism()),ct_c_c.getMorphism().getRightMorphism());
+						new_ct.add(new ChildTuple(new_co,remove_Identities_and_Iso(ct_c_c.getChildCondition())));
 					}
 					else {
-						new_ct.add(new ChildTuple(ct.getMorphism(), removeIdentities(c_c)));
-					}
+						new_ct.add(new ChildTuple(ct.getMorphism(), remove_Identities_and_Iso(c_c)));
+					}				
+				}
+				else {
+					new_ct.add(new ChildTuple(ct.getMorphism(), remove_Identities_and_Iso(c_c)));
 				}
 			}
 			return new CospanCondition(c.getOrigin(),c.getQuantifier(),new_ct);
 		}		
 		return null;
-	}	
+	}
+	
 	
 	// from CospanCondition -and CospanHelper to avoid loops
 	
