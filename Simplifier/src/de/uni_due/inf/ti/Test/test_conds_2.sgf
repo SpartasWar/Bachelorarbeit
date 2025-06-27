@@ -1,0 +1,12 @@
+gnode = graph { node n0; };
+g2node = graph { node n0; node n1; };
+g2node1loop = graph { node n0; n1 --A-> n1; };
+g1node1loop = graph { n0 --A-> n0; };
+empty = graph { };
+aEdge = graph { n0 --A-> n1; };
+
+sat_easy = exists { { empty -> aEdge <- empty } => true };
+
+simple = forall { { gnode -> g2node <- g2node } => exists { g2node -> g2node1loop <- g2node } => true} };
+
+complete = and [ simple, forall {  {g1node -> g1node <- g1node } => exists { { g1node -> g1node1loop <- g1node } => true } ];

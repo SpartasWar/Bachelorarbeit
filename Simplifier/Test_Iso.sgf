@@ -1,0 +1,14 @@
+node3 = graph { node n3; }
+empty = graph { }
+
+
+Con_1 = forall { { node3 -> { node n3; } <- { node n3; } } => exists { { { node n3; } -> { n3 --A-> n4; } <- { node n3; node n4; } } => true } }
+Con_2 = forall { { node3 -> { n3 --A-> n4; } <- { node n3; node n4; } } => false } 
+Con_and = and [ Con_1, Con_2 ]
+Con = exists { { { node n1; } -> { node n2; } <- node3 } => Con_and }
+
+
+Con2_Helper1 = forall { { empty -> empty <- empty } => false}
+Con2_Helper2 = forall { { empty -> { node n3; node n2; } <- empty } => exists { { empty -> node3 <- node3 } => true } }
+Con2_Helper3 = and [ Con2_Helper1, Con2_Helper2 ]
+Con2 = exists { { empty -> empty <- empty } => Con2_Helper3 }

@@ -1,0 +1,4 @@
+gnode = graph { node n0; };
+empty = graph { };
+
+con = exists { { empty -> empty <- empty } => forall { { empty -> empty <- empty } => or [ exists { { empty -> gnode <- gnode } => true }, exists { { empty -> empty <- empty } => true } ] } }
