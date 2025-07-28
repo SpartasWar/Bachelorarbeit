@@ -1,0 +1,10 @@
+empty = graph { };
+1node = graph { node n1; };
+2node = graph { node n1; node n2; };
+Aloop = graph { n1 --A-> n1; };
+Bline = graph { n1 --B-> n2; };
+AloopBline = graph { n1 --B-> n2; n1 --A-> n1; };
+
+Con_1 = and [ forall { { 1node -> Aloop <- 1node } => false }, forall { { 1node -> Aloop <- 1node } => exists { { 1node -> 1node <- 1node } => true } }];
+Con_2 = or [ exists { { 1node -> 1node <- 1node } => Con_1 }, exists { { 1node -> Bline <- 2node } => forall { { 2node -> AloopBline <- 2node} => false } } ];
+cond = forall { { empty -> 1node <- 1node } => Con_2 };

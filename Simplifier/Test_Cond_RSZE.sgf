@@ -13,4 +13,4 @@ Con2 = or [ Con2_1, Con2_2 ];
 Conl = exists { { 2nodes -> { n2 --B-> n3; node n1; } <- 3nodes } => true };
 ConVor1 = forall { { empty -> ABline <- 3nodes } => Con2 };
 ConVor2 = forall { { empty -> Aline <- 2nodes } => Con1 };
-Con= and [ ConVor1, ConVor2 ];
+cond= and [ ConVor1, ConVor2 ];

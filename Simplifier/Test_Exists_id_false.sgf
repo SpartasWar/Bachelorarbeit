@@ -1,4 +1,4 @@
 empty = graph { }
 
-Con1 = exists { { { } -> { node n1; node n2; node n3; } <- { } } => forall { { { } -> { } <- { } } => false } }
+cond = exists { { { } -> { node n1; node n2; node n3; } <- { } } => forall { { { } -> { } <- { } } => false } }
 Con = exists { { { } -> { } <- { } } => forall { { { } -> { } <- { } } => false } }
